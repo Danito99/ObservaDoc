@@ -648,23 +648,36 @@ textarea.fc{resize:vertical;min-height:70px}
     <!-- PROGRAMAS -->
     <div class="page" id="page-programas">
       <div class="ph">
-        <div class="ph-left"><h2>Programas de formación</h2><p>Ciclo 2026–27 · Competencias validadas por observación de aula</p></div>
+        <div class="ph-left"><h2>Programas de formación</h2><p>Ciclo 2026–27 · Hitos validados por observación de aula</p></div>
       </div>
-      <div class="prog-grid" id="prog-cards"></div>
-      <div id="prog-detail" style="display:none">
-        <div class="hitos-section">
-          <div class="hitos-header">
-            <div>
-              <div style="font-size:10px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;color:var(--ink3)" id="prog-detail-label"></div>
-              <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--ink);margin-top:3px" id="prog-detail-title"></div>
-            </div>
-            <span id="prog-detail-rango" class="rango-pill"></span>
-          </div>
-          <div class="hitos-grid" id="prog-hitos-grid"></div>
+      <!-- LISTA DE DOCENTES -->
+      <div id="prog-list-view">
+        <div class="filters" style="margin-bottom:14px">
+          <input class="fsearch" type="text" placeholder="Buscar docente..." id="f-prog-search" oninput="renderProgramas()">
         </div>
-        <div>
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3)">Avance por colegiado</div>
-          <div class="colegiado-grid" id="prog-colegiados"></div>
+        <div id="prog-teacher-grid" class="teacher-grid"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+      </div>
+      <!-- DETALLE DEL DOCENTE -->
+      <div id="prog-detail-view" style="display:none">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+          <button class="btn btn-outline btn-sm" onclick="closeTeacherProgramas()">← Volver</button>
+          <div>
+            <h3 id="prog-teacher-name" style="font-family:'Playfair Display',serif;font-size:20px"></h3>
+            <p style="font-size:12px;color:var(--ink3)">Ciclo escolar 2026–27</p>
+          </div>
+        </div>
+        <div class="prog-grid" id="prog-cards"></div>
+        <div id="prog-hitos-section" style="display:none">
+          <div class="hitos-section">
+            <div class="hitos-header">
+              <div>
+                <div style="font-size:10px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;color:var(--ink3)" id="prog-detail-label"></div>
+                <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--ink);margin-top:3px" id="prog-detail-title"></div>
+              </div>
+              <span id="prog-detail-rango" class="rango-pill"></span>
+            </div>
+            <div class="hitos-grid" id="prog-hitos-grid"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -748,6 +761,21 @@ textarea.fc{resize:vertical;min-height:70px}
     <div class="modal-ftr">
       <button class="btn btn-outline" onclick="closeModal('modal-act')">Cancelar</button>
       <button class="btn btn-primary" onclick="saveActivity()" id="save-btn">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL HITO VALIDACIÓN -->
+<div class="modal-overlay" id="modal-hito">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3 id="hito-modal-title">Validar hito</h3>
+      <button class="modal-close" onclick="closeModal('modal-hito')">✕</button>
+    </div>
+    <div class="modal-body" id="hito-modal-body" style="max-height:60vh;overflow-y:auto"></div>
+    <div class="modal-ftr">
+      <button class="btn btn-outline" onclick="closeModal('modal-hito')">Cancelar</button>
+      <button class="btn btn-primary" id="hito-modal-save-btn" onclick="saveHitoValidation()">Validar hito</button>
     </div>
   </div>
 </div>
@@ -933,7 +961,8 @@ function nav(page) {
 }
 
 // ===== PROGRAMAS DE FORMACIÓN =====
-let selectedPrograma = null;
+let selectedPrograma = null, currentProgTeacher = null, currentProgValidations = [], currentHitoContext = null;
+
 const PROGRAMAS = {
   aprendizaje: {
     label: 'Programa de formación · 2026–27',
@@ -951,13 +980,6 @@ const PROGRAMAS = {
       {n:9,nombre:'ABP — Reflexión',desc:'Cierre metacognitivo del proyecto',esABP:true},
       {n:10,nombre:'Cierre integral',desc:'Gran mapa de competencias del ciclo'},
     ],
-    completados:[1,2,3],
-    colegiados:[
-      {nombre:'Español',sub:'Novatos · 8 docentes',pct:62,color:'var(--teal)'},
-      {nombre:'Matemáticas',sub:'Consolidados · 7 docentes',pct:48,color:'var(--amber)'},
-      {nombre:'Inglés',sub:'Veteranos · 6 docentes',pct:74,color:'var(--rose)'},
-      {nombre:'Especiales',sub:'Especiales · 5 docentes',pct:55,color:'var(--violet)'},
-    ]
   },
   gamificacion: {
     label: 'Insignia maestra · Tecnología · 2026–27',
@@ -974,14 +996,34 @@ const PROGRAMAS = {
       {n:8,nombre:'Economía y progresión',desc:'XP, niveles y desbloqueos equilibrados',bloque:'Gamificar el sistema'},
       {n:9,nombre:'Misiones y boss final',desc:'Misiones encadenadas, evaluación auténtica',bloque:'Gamificar el sistema'},
       {n:10,nombre:'Sistema completo',desc:'Integración de todos los elementos',bloque:'Gamificar el sistema'},
-    ],
-    completados:[1],
-    colegiados:[
-      {nombre:'Español',sub:'Novatos · 8 docentes',pct:28,color:'var(--teal)'},
-      {nombre:'Matemáticas',sub:'Consolidados · 7 docentes',pct:35,color:'var(--amber)'},
-      {nombre:'Inglés',sub:'Veteranos · 6 docentes',pct:42,color:'var(--rose)'},
-      {nombre:'Especiales',sub:'Especiales · 5 docentes',pct:20,color:'var(--violet)'},
     ]
+  }
+};
+
+const HITO_CRITERIA = {
+  aprendizaje: {
+    1: ['Asistió a la sesión de lanzamiento del programa','Comprende el propósito del plan anual y las técnicas a trabajar','Puede explicar qué se espera del docente durante el ciclo'],
+    2: ['Los alumnos trabajan cognitivamente al menos 30% del tiempo (pensar, escribir, analizar)','El 100% de los alumnos participa y produce evidencia de aprendizaje','Las actividades demandan pensamiento de alto nivel (aplicar, analizar, evaluar o crear)','El aprendizaje conecta con contextos reales o conocimientos previos del alumno'],
+    3: ['La clase inicia con un elemento que captura el interés en los primeros minutos','El enganche conecta con contextos reales o relevantes para el alumno','Los alumnos muestran curiosidad o participación activa desde el inicio de la clase'],
+    4: ['La energía del salón es alta y enfocada durante la actividad principal','Los alumnos participan con entusiasmo genuino, no solo por obligación','El docente mantiene un ritmo dinámico sin perder el foco académico'],
+    5: ['El docente presenta el proyecto con un gancho que genera curiosidad e interés','Los alumnos comprenden la pregunta o reto central del proyecto','La pregunta o reto conecta con un contexto real o significativo','Los alumnos muestran motivación visible para iniciar el proyecto'],
+    6: ['Los alumnos tienen una hoja de ruta clara (etapas, responsables, tiempos)','Los roles del equipo están definidos y son comprensibles para todos','El plan se alinea con los objetivos de aprendizaje de la unidad','Los alumnos pueden explicar su plan de trabajo'],
+    7: ['Los alumnos investigan y producen contenido de forma activa y autónoma','El docente acompaña y guía sin sustituir el trabajo del alumno','Hay evidencia visible del proceso de creación (borradores, esquemas, productos parciales)','Las fuentes y recursos de investigación son pertinentes y variados'],
+    8: ['Los alumnos presentan su producto a una audiencia real (compañeros, directivos u otra)','La presentación demuestra apropiación del aprendizaje','Hay retroalimentación estructurada durante o después de la presentación','El producto final evidencia pensamiento de alto nivel'],
+    9: ['Hay un espacio estructurado para que los alumnos reflexionen sobre su proceso','Los alumnos pueden articular qué aprendieron y cómo lo aprendieron','Se identifican aprendizajes logrados y áreas de mejora de forma explícita','El cierre conecta con el propósito inicial del proyecto'],
+    10: ['El docente evidencia al menos 3 técnicas del programa en sus planeaciones','Las técnicas están implementadas con evidencia de observación de aula','El docente puede explicar el impacto observable en sus alumnos','Hay evidencia de mejora en participación o aprendizaje de los alumnos'],
+  },
+  gamificacion: {
+    1: ['Los alumnos reciben información de su desempeño durante la actividad, no solo al final','La retroalimentación es específica (qué ajustar), no solo "bien / mal"','Existe un mecanismo visible de avance (marcador, barra, tablero o señal)','El alumno puede actuar sobre la retroalimentación en la misma sesión'],
+    2: ['La meta de aprendizaje está visible para los alumnos','La meta está desglosada en hitos o pasos','Existe un soporte visual de avance (barra, mapa, checklist)','Los alumnos pueden ubicar dónde están en cualquier momento de la clase'],
+    3: ['La actividad ofrece distintos niveles de dificultad u opciones','Los niveles permiten avanzar a alumnos con distinto punto de partida','Hay forma de subir o ajustar el reto (no se queda fácil ni imposible)','Los alumnos eligen o se ubican en su nivel adecuado'],
+    4: ['El sistema de puntos es transparente y conocido por los alumnos','Se premian conductas alineadas al aprendizaje (proceso, esfuerzo, colaboración), no solo el resultado','Las recompensas no dependen de premios materiales','Los puntos no sustituyen ni opacan el valor de la tarea'],
+    5: ['Existe una mecánica de colaboración o competencia entre equipos','Los equipos o condiciones están equilibrados','Ningún alumno queda expuesto por comparación pública individual','La mecánica fomenta interdependencia positiva (se necesitan entre sí)'],
+    6: ['Existe un documento de diseño de la unidad gamificada','Define un objetivo de aprendizaje claro','Define un tema o marco coherente con el contenido','Las mecánicas centrales se alinean con autonomía, competencia o relación'],
+    7: ['La unidad tiene un marco narrativo o tema sostenido','La narrativa sirve al contenido (no lo disfraza)','El alumno tiene una identidad o rol dentro del mundo','La narrativa se mantiene a lo largo de toda la unidad'],
+    8: ['Existe una progresión clara (niveles, rangos o desbloqueos)','La progresión está equilibrada (sin inflación ni estancamiento)','Las recompensas favorecen autonomía y competencia sobre lo material','El alumno percibe crecimiento a lo largo de la unidad'],
+    9: ['La unidad está estructurada en misiones o quests con secuencia','Las misiones tienen objetivos accionables y claros','Existe un reto culminante (boss) que integra lo aprendido','El reto culminante evalúa de forma auténtica, con criterios visibles desde el inicio'],
+    10: ['El docente integra narrativa, progresión y misiones en un sistema coherente','El sistema se implementa en una unidad real con los alumnos','Existe un plan de medición (participación, motivación, logro)','El docente recoge evidencia del efecto del sistema en sus alumnos'],
   }
 };
 
@@ -994,9 +1036,10 @@ function getRangoProg(completados, progId, hitos) {
   return {label:'Aprendiz',cls:'rango-aprendiz',icon:'○'};
 }
 
-function hitoCardHTML(h, completados) {
+function hitoCardHTML(h, completados, teacherName, progId) {
   const done = completados.includes(h.n);
-  return `<div class="hito ${done?'logrado':''}">
+  const tn = (teacherName||'').replace(/'/g,"\\'");
+  return `<div class="hito ${done?'logrado':''}" onclick="openHitoModal('${progId}',${h.n},'${tn}')" title="Haga clic para ver criterios">
     <div class="hito-icon">${done?'✓':h.n}</div>
     <div class="hito-n">${h.nombre}</div>
     <div class="hito-sub">${h.desc}</div>
@@ -1005,17 +1048,70 @@ function hitoCardHTML(h, completados) {
   </div>`;
 }
 
-function selectPrograma(id) {
-  selectedPrograma = selectedPrograma===id ? null : id;
+async function renderProgramas() {
+  const grid = document.getElementById('prog-teacher-grid');
+  if (!grid) return;
+  const search = (document.getElementById('f-prog-search')?.value || '').toLowerCase();
+  const filtered = teachers.filter(t => t.active !== false && (!search || t.name.toLowerCase().includes(search)));
+  if (!filtered.length) { grid.innerHTML = '<div class="empty"><p>No se encontraron docentes</p></div>'; return; }
+  grid.innerHTML = '<div class="loading"><div class="spinner"></div>Cargando...</div>';
+  let allVals = [];
+  try { allVals = await sb('badge_validations?ciclo_escolar=eq.2026-2027&validated=eq.true&select=teacher_name,programa_id'); } catch(e) {}
+  grid.innerHTML = filtered.map(t => {
+    const tv = allVals.filter(v=>v.teacher_name===t.name);
+    const cA = tv.filter(v=>v.programa_id==='aprendizaje').length;
+    const cG = tv.filter(v=>v.programa_id==='gamificacion').length;
+    return `<div class="teacher-card" onclick="openTeacherProgramas('${t.name.replace(/'/g,"\\'")}')">
+      <div class="tc-header">
+        <div class="tc-avatar">${initials(t.name)}</div>
+        <div><div class="tc-name">${t.name}</div><div class="tc-total">Ver programas</div></div>
+      </div>
+      <div class="tc-bars">
+        <div class="tc-bar-row"><span class="tc-bar-lbl">Apr.</span>
+          <div class="tc-bar-track"><div class="tc-bar-fill" style="width:${Math.round(cA/10*100)}%;background:var(--ch-orange)"></div></div>
+          <span class="tc-bar-val">${cA}/10</span></div>
+        <div class="tc-bar-row"><span class="tc-bar-lbl">Gam.</span>
+          <div class="tc-bar-track"><div class="tc-bar-fill" style="width:${Math.round(cG/10*100)}%;background:var(--violet)"></div></div>
+          <span class="tc-bar-val">${cG}/10</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function openTeacherProgramas(teacherName) {
+  currentProgTeacher = teacherName;
+  selectedPrograma = null;
+  document.getElementById('prog-list-view').style.display = 'none';
+  document.getElementById('prog-detail-view').style.display = 'block';
+  document.getElementById('prog-teacher-name').textContent = teacherName;
+  document.getElementById('prog-hitos-section').style.display = 'none';
+  try {
+    currentProgValidations = await sb(`badge_validations?teacher_name=eq.${encodeURIComponent(teacherName)}&ciclo_escolar=eq.2026-2027`);
+  } catch(e) { currentProgValidations = []; }
+  renderProgCards();
+}
+
+function closeTeacherProgramas() {
+  currentProgTeacher = null; currentProgValidations = []; selectedPrograma = null;
+  document.getElementById('prog-list-view').style.display = '';
+  document.getElementById('prog-detail-view').style.display = 'none';
+  document.getElementById('prog-hitos-section').style.display = 'none';
   renderProgramas();
 }
 
-function renderProgramas() {
+function selectPrograma(id) {
+  selectedPrograma = selectedPrograma===id ? null : id;
+  document.getElementById('prog-hitos-section').style.display = selectedPrograma ? '' : 'none';
+  renderProgCards();
+}
+
+function renderProgCards() {
   const cards = document.getElementById('prog-cards');
-  if (!cards) return;
+  if (!cards || !currentProgTeacher) return;
   cards.innerHTML = Object.entries(PROGRAMAS).map(([id,p]) => {
-    const r = getRangoProg(p.completados, id, p.hitos);
-    const pct = Math.round(p.completados.length / p.hitos.length * 100);
+    const completados = currentProgValidations.filter(v=>v.programa_id===id && v.validated).map(v=>v.hito_n);
+    const r = getRangoProg(completados, id, p.hitos);
+    const pct = Math.round(completados.length/p.hitos.length*100);
     const sel = selectedPrograma===id;
     return `<div class="prog-card ${sel?'selected':''}" onclick="selectPrograma('${id}')">
       <div class="prog-label">${p.label}</div>
@@ -1023,43 +1119,87 @@ function renderProgramas() {
       <div class="prog-desc">${p.desc}</div>
       <div class="prog-bar-wrap"><div class="prog-bar" style="width:${pct}%"></div></div>
       <div class="prog-stats">
-        <div class="prog-stat"><b>${p.completados.length}/${p.hitos.length}</b><span>competencias</span></div>
+        <div class="prog-stat"><b>${completados.length}/${p.hitos.length}</b><span>competencias</span></div>
         <div class="prog-stat"><b>${pct}%</b><span>avance</span></div>
       </div>
       <span class="rango-pill ${r.cls}">${r.icon} ${r.label}</span>
       <div style="font-size:11px;color:var(--ink3);margin-top:10px">${sel?'▲ Cerrar detalle':'▼ Ver competencias'}</div>
     </div>`;
   }).join('');
+  if (selectedPrograma) renderProgHitos(selectedPrograma);
+}
 
-  const detail = document.getElementById('prog-detail');
-  if (!selectedPrograma) { detail.style.display='none'; return; }
-  detail.style.display='';
-  const p = PROGRAMAS[selectedPrograma];
-  const r = getRangoProg(p.completados, selectedPrograma, p.hitos);
+function renderProgHitos(progId) {
+  const p = PROGRAMAS[progId];
+  const completados = currentProgValidations.filter(v=>v.programa_id===progId && v.validated).map(v=>v.hito_n);
+  const r = getRangoProg(completados, progId, p.hitos);
   document.getElementById('prog-detail-label').textContent = p.label;
   document.getElementById('prog-detail-title').textContent = p.title;
   const rangoEl = document.getElementById('prog-detail-rango');
   rangoEl.className = 'rango-pill '+r.cls;
   rangoEl.textContent = r.icon+' '+r.label;
-
-  let hitosHTML = '';
-  if (selectedPrograma==='gamificacion') {
+  let html = '';
+  if (progId==='gamificacion') {
     ['Gamificar el momento','Gamificar el sistema'].forEach(b => {
-      hitosHTML += `<div class="bloque-sep">${b}</div>`;
-      p.hitos.filter(h=>h.bloque===b).forEach(h => { hitosHTML += hitoCardHTML(h, p.completados); });
+      html += `<div class="bloque-sep">${b}</div>`;
+      p.hitos.filter(h=>h.bloque===b).forEach(h => { html += hitoCardHTML(h, completados, currentProgTeacher, progId); });
     });
   } else {
-    p.hitos.forEach(h => { hitosHTML += hitoCardHTML(h, p.completados); });
+    p.hitos.forEach(h => { html += hitoCardHTML(h, completados, currentProgTeacher, progId); });
   }
-  document.getElementById('prog-hitos-grid').innerHTML = hitosHTML;
+  document.getElementById('prog-hitos-grid').innerHTML = html;
+}
 
-  document.getElementById('prog-colegiados').innerHTML = p.colegiados.map(c=>`
-    <div class="col-card">
-      <div class="col-name">${c.nombre}</div>
-      <div class="col-sub">${c.sub}</div>
-      <div class="col-bar-wrap"><div class="col-bar" style="width:${c.pct}%;background:${c.color}"></div></div>
-      <div class="col-pct">${c.pct}% de avance promedio</div>
-    </div>`).join('');
+function openHitoModal(progId, hitoN, teacherName) {
+  currentHitoContext = {progId, hitoN, teacherName};
+  const hito = PROGRAMAS[progId].hitos.find(h=>h.n===hitoN);
+  const existing = currentProgValidations.find(v=>v.programa_id===progId && v.hito_n===hitoN);
+  const criteria = HITO_CRITERIA[progId][hitoN] || [];
+  const checked = existing?.criteria_checked || [];
+  document.getElementById('hito-modal-title').textContent = `Hito ${hitoN} · ${hito.nombre}`;
+  document.getElementById('hito-modal-save-btn').textContent = existing?.validated ? 'Actualizar' : 'Validar hito';
+  document.getElementById('hito-modal-body').innerHTML = `
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:16px">${hito.desc} · <b>${teacherName}</b></div>
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);margin-bottom:10px">Criterios observables</div>
+    ${criteria.map((c,i)=>`<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;color:var(--ink);line-height:1.4">
+      <input type="checkbox" id="hc-${i}" style="margin-top:2px;width:15px;height:15px;accent-color:var(--ch-orange);flex-shrink:0" ${checked[i]?'checked':''}>${c}</label>`).join('')}
+    <div style="margin-top:16px">
+      <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);display:block;margin-bottom:6px">Notas del observador</label>
+      <textarea id="hito-notes" class="fc" style="min-height:70px" placeholder="Evidencia observada, contexto, recomendaciones...">${existing?.notes||''}</textarea>
+    </div>
+    ${existing?.validated?`<div style="font-size:11.5px;color:var(--ch-orange);margin-top:12px;font-weight:500">✓ Validado por ${existing.validated_by||'—'}</div>`:''}
+  `;
+  openModal('modal-hito');
+}
+
+async function saveHitoValidation() {
+  const {progId, hitoN, teacherName} = currentHitoContext;
+  const criteria = HITO_CRITERIA[progId][hitoN] || [];
+  const criteriaChecked = criteria.map((_,i) => !!document.getElementById(`hc-${i}`)?.checked);
+  const notes = document.getElementById('hito-notes')?.value || '';
+  const allChecked = criteriaChecked.every(Boolean);
+  const payload = {teacher_name:teacherName, programa_id:progId, hito_n:hitoN, criteria_checked:criteriaChecked,
+    validated:allChecked, validated_by:currentProfile?.name||currentUser?.email||'',
+    validated_at:allChecked?new Date().toISOString():null, notes, ciclo_escolar:'2026-2027', updated_at:new Date().toISOString()};
+  const btn = document.getElementById('hito-modal-save-btn');
+  btn.disabled=true; btn.textContent='Guardando...';
+  try {
+    const existing = currentProgValidations.find(v=>v.programa_id===progId && v.hito_n===hitoN);
+    if (existing) {
+      await sb(`badge_validations?id=eq.${existing.id}`, {method:'PATCH', body:JSON.stringify(payload)});
+      Object.assign(existing, payload);
+    } else {
+      const created = await sb('badge_validations', {method:'POST', body:JSON.stringify(payload)});
+      if (created?.[0]) currentProgValidations.push(created[0]);
+    }
+    closeModal('modal-hito');
+    notify(allChecked ? `✓ Hito validado: ${PROGRAMAS[progId].hitos.find(h=>h.n===hitoN).nombre}` : 'Progreso guardado');
+    renderProgCards();
+  } catch(e) {
+    notify('Error al guardar. Verifica tu conexión.');
+  } finally {
+    btn.disabled=false; btn.textContent='Validar hito';
+  }
 }
 
 function populateSelects() {
