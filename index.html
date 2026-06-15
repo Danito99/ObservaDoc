@@ -240,6 +240,47 @@ textarea.fc{resize:vertical;min-height:70px}
 .notif{position:fixed;top:18px;right:20px;background:var(--ink);color:#fff;padding:11px 16px;border-radius:var(--r-sm);font-size:13px;z-index:999;transform:translateX(130%);transition:.3s;box-shadow:var(--shadow)}
 .notif.show{transform:translateX(0)}
 .own-badge{font-size:10.5px;background:rgba(43,145,207,.12);color:#1a6fa3;padding:1px 7px;border-radius:20px;margin-left:6px}
+/* PROGRAMAS DE FORMACIÓN */
+.prog-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.prog-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:20px;cursor:pointer;transition:.15s;position:relative}
+.prog-card:hover{border-color:var(--ch-orange);box-shadow:0 4px 14px rgba(245,145,32,.1)}
+.prog-card.selected{border-color:var(--ch-orange);box-shadow:0 0 0 2px rgba(245,145,32,.15)}
+.prog-label{font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:var(--ink3);margin-bottom:6px}
+.prog-title{font-family:'Playfair Display',serif;font-size:17px;color:var(--ink);margin-bottom:4px;line-height:1.3}
+.prog-desc{font-size:12px;color:var(--ink3);margin-bottom:16px}
+.prog-bar-wrap{height:6px;background:var(--paper2);border-radius:99px;overflow:hidden;margin-bottom:10px}
+.prog-bar{height:100%;background:var(--ch-orange);border-radius:99px}
+.prog-stats{display:flex;gap:20px}
+.prog-stat b{display:block;font-size:15px;font-weight:700;color:var(--ink)}
+.prog-stat span{font-size:11px;color:var(--ink3)}
+.rango-pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:99px;margin-top:14px}
+.rango-aprendiz{background:#f1f0ee;color:#6b6764}
+.rango-practicante{background:var(--teal-bg);color:var(--teal-text)}
+.rango-maestro{background:var(--amber-bg);color:var(--amber-text)}
+.rango-referente{background:#edf7ed;color:#2a6e24}
+.hitos-section{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px}
+.hitos-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px}
+.hitos-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.hito{border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 8px;text-align:center;background:var(--paper);transition:.15s}
+.hito.logrado{background:var(--white);border-color:rgba(245,145,32,.4);box-shadow:0 2px 8px rgba(245,145,32,.08)}
+.hito-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 7px;font-size:12px;font-weight:700;background:var(--paper2);color:var(--ink3)}
+.hito.logrado .hito-icon{background:rgba(245,145,32,.15);color:var(--ch-orange);font-size:16px}
+.hito-n{font-weight:600;font-size:11.5px;color:var(--ink);line-height:1.3}
+.hito-sub{font-size:10.5px;color:var(--ink3);margin-top:3px;line-height:1.3}
+.hito-abp{display:inline-block;margin-top:5px;font-size:9.5px;font-weight:600;padding:1px 6px;border-radius:99px;background:var(--violet-bg);color:var(--violet-text)}
+.hito-status{display:inline-block;margin-top:5px;font-size:9.5px;font-weight:600;padding:1px 6px;border-radius:99px}
+.hito.logrado .hito-status{background:#edf7ed;color:#2a6e24}
+.hito:not(.logrado) .hito-status{background:var(--paper2);color:var(--ink3)}
+.bloque-sep{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);grid-column:1/-1;padding:4px 0 2px;border-top:1px solid var(--border);margin-top:4px}
+.bloque-sep:first-child{border-top:none;margin-top:0;padding-top:0}
+.colegiado-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
+.col-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px}
+.col-name{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:2px}
+.col-sub{font-size:11px;color:var(--ink3);margin-bottom:10px}
+.col-bar-wrap{height:5px;background:var(--paper2);border-radius:99px;overflow:hidden;margin-bottom:6px}
+.col-bar{height:100%;border-radius:99px}
+.col-pct{font-size:11px;font-weight:500;color:var(--ink3)}
+@media(max-width:860px){.prog-grid,.colegiado-grid{grid-template-columns:1fr}.hitos-grid{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
@@ -297,6 +338,7 @@ textarea.fc{resize:vertical;min-height:70px}
       </button>
       <div class="nav-sec">Coaching</div>
       <button class="nav-item" onclick="nav('coaching')"><span>❋</span> Ciclos de coaching</button>
+      <button class="nav-item" onclick="nav('programas')"><span>◆</span> Programas</button>
       <div class="nav-sec">Análisis avanzado</div>
       <button class="nav-item" onclick="nav('reportes')"><span>◑</span> Reportes</button>
       <div class="nav-sec">Mi cuenta</div>
@@ -603,6 +645,30 @@ textarea.fc{resize:vertical;min-height:70px}
       </div>
     </div>
 
+    <!-- PROGRAMAS -->
+    <div class="page" id="page-programas">
+      <div class="ph">
+        <div class="ph-left"><h2>Programas de formación</h2><p>Ciclo 2026–27 · Competencias validadas por observación de aula</p></div>
+      </div>
+      <div class="prog-grid" id="prog-cards"></div>
+      <div id="prog-detail" style="display:none">
+        <div class="hitos-section">
+          <div class="hitos-header">
+            <div>
+              <div style="font-size:10px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;color:var(--ink3)" id="prog-detail-label"></div>
+              <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--ink);margin-top:3px" id="prog-detail-title"></div>
+            </div>
+            <span id="prog-detail-rango" class="rango-pill"></span>
+          </div>
+          <div class="hitos-grid" id="prog-hitos-grid"></div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3)">Avance por colegiado</div>
+          <div class="colegiado-grid" id="prog-colegiados"></div>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -863,6 +929,137 @@ function nav(page) {
   if (page==='micalendario') renderMyCalendar();
   if (page==='gestionar') renderGestionar();
   if (page==='coaching') renderCoachingList();
+  if (page==='programas') renderProgramas();
+}
+
+// ===== PROGRAMAS DE FORMACIÓN =====
+let selectedPrograma = null;
+const PROGRAMAS = {
+  aprendizaje: {
+    label: 'Programa de formación · 2026–27',
+    title: 'Aprendizaje Activo y Clases Atractivas',
+    desc: '10 competencias · sesiones de 1:30 h',
+    hitos: [
+      {n:1,nombre:'Lanzamiento',desc:'Propósito y marco del plan anual'},
+      {n:2,nombre:'Aumento de Ratio',desc:'Maximizar el trabajo cognitivo del alumno'},
+      {n:3,nombre:'The Hook',desc:'Capturar el interés desde el inicio'},
+      {n:4,nombre:'The Joy Factor',desc:'Energía del salón alta y enfocada'},
+      {n:5,nombre:'ABP — Lanzamiento',desc:'El gancho del proyecto',esABP:true},
+      {n:6,nombre:'ABP — Planificación',desc:'Hoja de ruta del proyecto',esABP:true},
+      {n:7,nombre:'ABP — Investigación',desc:'Corazón del proyecto',esABP:true},
+      {n:8,nombre:'ABP — Presentación',desc:'La cumbre del proyecto',esABP:true},
+      {n:9,nombre:'ABP — Reflexión',desc:'Cierre metacognitivo del proyecto',esABP:true},
+      {n:10,nombre:'Cierre integral',desc:'Gran mapa de competencias del ciclo'},
+    ],
+    completados:[1,2,3],
+    colegiados:[
+      {nombre:'Español',sub:'Novatos · 8 docentes',pct:62,color:'var(--teal)'},
+      {nombre:'Matemáticas',sub:'Consolidados · 7 docentes',pct:48,color:'var(--amber)'},
+      {nombre:'Inglés',sub:'Veteranos · 6 docentes',pct:74,color:'var(--rose)'},
+      {nombre:'Especiales',sub:'Especiales · 5 docentes',pct:55,color:'var(--violet)'},
+    ]
+  },
+  gamificacion: {
+    label: 'Insignia maestra · Tecnología · 2026–27',
+    title: 'Gamificación en el aula',
+    desc: '10 competencias · dos bloques de 5 sesiones',
+    hitos: [
+      {n:1,nombre:'Retroalimentación viva',desc:'Feedback inmediato y accionable',bloque:'Gamificar el momento'},
+      {n:2,nombre:'Metas y progreso visible',desc:'La meta y el avance siempre visibles',bloque:'Gamificar el momento'},
+      {n:3,nombre:'Reto graduado',desc:'Dificultad ajustada a cada alumno',bloque:'Gamificar el momento'},
+      {n:4,nombre:'Puntos con propósito',desc:'XP que refuerza, no que soborna',bloque:'Gamificar el momento'},
+      {n:5,nombre:'Aula social',desc:'Colaboración y competencia sana',bloque:'Gamificar el momento'},
+      {n:6,nombre:'Arquitectura del sistema',desc:'Estructura base de la unidad gamificada',bloque:'Gamificar el sistema'},
+      {n:7,nombre:'Narrativa y mundo',desc:'Marco narrativo y rol del alumno',bloque:'Gamificar el sistema'},
+      {n:8,nombre:'Economía y progresión',desc:'XP, niveles y desbloqueos equilibrados',bloque:'Gamificar el sistema'},
+      {n:9,nombre:'Misiones y boss final',desc:'Misiones encadenadas, evaluación auténtica',bloque:'Gamificar el sistema'},
+      {n:10,nombre:'Sistema completo',desc:'Integración de todos los elementos',bloque:'Gamificar el sistema'},
+    ],
+    completados:[1],
+    colegiados:[
+      {nombre:'Español',sub:'Novatos · 8 docentes',pct:28,color:'var(--teal)'},
+      {nombre:'Matemáticas',sub:'Consolidados · 7 docentes',pct:35,color:'var(--amber)'},
+      {nombre:'Inglés',sub:'Veteranos · 6 docentes',pct:42,color:'var(--rose)'},
+      {nombre:'Especiales',sub:'Especiales · 5 docentes',pct:20,color:'var(--violet)'},
+    ]
+  }
+};
+
+function getRangoProg(completados, progId, hitos) {
+  const n = completados.length;
+  const tieneABP = progId==='aprendizaje' && completados.some(c => hitos.find(h=>h.n===c && h.esABP));
+  if (n>=7) return {label:'Referente',cls:'rango-referente',icon:'◈'};
+  if (n>=5 && (progId!=='aprendizaje' || tieneABP)) return {label:'Maestro',cls:'rango-maestro',icon:'◉'};
+  if (n>=3) return {label:'Practicante',cls:'rango-practicante',icon:'◎'};
+  return {label:'Aprendiz',cls:'rango-aprendiz',icon:'○'};
+}
+
+function hitoCardHTML(h, completados) {
+  const done = completados.includes(h.n);
+  return `<div class="hito ${done?'logrado':''}">
+    <div class="hito-icon">${done?'✓':h.n}</div>
+    <div class="hito-n">${h.nombre}</div>
+    <div class="hito-sub">${h.desc}</div>
+    ${h.esABP?'<span class="hito-abp">ABP</span>':''}
+    <span class="hito-status">${done?'Validado':'Pendiente'}</span>
+  </div>`;
+}
+
+function selectPrograma(id) {
+  selectedPrograma = selectedPrograma===id ? null : id;
+  renderProgramas();
+}
+
+function renderProgramas() {
+  const cards = document.getElementById('prog-cards');
+  if (!cards) return;
+  cards.innerHTML = Object.entries(PROGRAMAS).map(([id,p]) => {
+    const r = getRangoProg(p.completados, id, p.hitos);
+    const pct = Math.round(p.completados.length / p.hitos.length * 100);
+    const sel = selectedPrograma===id;
+    return `<div class="prog-card ${sel?'selected':''}" onclick="selectPrograma('${id}')">
+      <div class="prog-label">${p.label}</div>
+      <div class="prog-title">${p.title}</div>
+      <div class="prog-desc">${p.desc}</div>
+      <div class="prog-bar-wrap"><div class="prog-bar" style="width:${pct}%"></div></div>
+      <div class="prog-stats">
+        <div class="prog-stat"><b>${p.completados.length}/${p.hitos.length}</b><span>competencias</span></div>
+        <div class="prog-stat"><b>${pct}%</b><span>avance</span></div>
+      </div>
+      <span class="rango-pill ${r.cls}">${r.icon} ${r.label}</span>
+      <div style="font-size:11px;color:var(--ink3);margin-top:10px">${sel?'▲ Cerrar detalle':'▼ Ver competencias'}</div>
+    </div>`;
+  }).join('');
+
+  const detail = document.getElementById('prog-detail');
+  if (!selectedPrograma) { detail.style.display='none'; return; }
+  detail.style.display='';
+  const p = PROGRAMAS[selectedPrograma];
+  const r = getRangoProg(p.completados, selectedPrograma, p.hitos);
+  document.getElementById('prog-detail-label').textContent = p.label;
+  document.getElementById('prog-detail-title').textContent = p.title;
+  const rangoEl = document.getElementById('prog-detail-rango');
+  rangoEl.className = 'rango-pill '+r.cls;
+  rangoEl.textContent = r.icon+' '+r.label;
+
+  let hitosHTML = '';
+  if (selectedPrograma==='gamificacion') {
+    ['Gamificar el momento','Gamificar el sistema'].forEach(b => {
+      hitosHTML += `<div class="bloque-sep">${b}</div>`;
+      p.hitos.filter(h=>h.bloque===b).forEach(h => { hitosHTML += hitoCardHTML(h, p.completados); });
+    });
+  } else {
+    p.hitos.forEach(h => { hitosHTML += hitoCardHTML(h, p.completados); });
+  }
+  document.getElementById('prog-hitos-grid').innerHTML = hitosHTML;
+
+  document.getElementById('prog-colegiados').innerHTML = p.colegiados.map(c=>`
+    <div class="col-card">
+      <div class="col-name">${c.nombre}</div>
+      <div class="col-sub">${c.sub}</div>
+      <div class="col-bar-wrap"><div class="col-bar" style="width:${c.pct}%;background:${c.color}"></div></div>
+      <div class="col-pct">${c.pct}% de avance promedio</div>
+    </div>`).join('');
 }
 
 function populateSelects() {
