@@ -273,14 +273,7 @@ textarea.fc{resize:vertical;min-height:70px}
 .hito:not(.logrado) .hito-status{background:var(--paper2);color:var(--ink3)}
 .bloque-sep{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);grid-column:1/-1;padding:4px 0 2px;border-top:1px solid var(--border);margin-top:4px}
 .bloque-sep:first-child{border-top:none;margin-top:0;padding-top:0}
-.colegiado-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
-.col-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px}
-.col-name{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:2px}
-.col-sub{font-size:11px;color:var(--ink3);margin-bottom:10px}
-.col-bar-wrap{height:5px;background:var(--paper2);border-radius:99px;overflow:hidden;margin-bottom:6px}
-.col-bar{height:100%;border-radius:99px}
-.col-pct{font-size:11px;font-weight:500;color:var(--ink3)}
-@media(max-width:860px){.prog-grid,.colegiado-grid{grid-template-columns:1fr}.hitos-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:860px){.prog-grid{grid-template-columns:1fr}.hitos-grid{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
@@ -654,6 +647,13 @@ textarea.fc{resize:vertical;min-height:70px}
       <div id="prog-list-view">
         <div class="filters" style="margin-bottom:14px">
           <input class="fsearch" type="text" placeholder="Buscar docente..." id="f-prog-search" oninput="renderProgramas()">
+          <select class="fsel" id="f-prog-colegiado" onchange="renderProgramas()">
+            <option value="">Todos los colegiados</option>
+            <option value="Español">Español</option>
+            <option value="Matemáticas">Matemáticas</option>
+            <option value="Inglés">Inglés</option>
+            <option value="Especiales">Especiales</option>
+          </select>
         </div>
         <div id="prog-teacher-grid" class="teacher-grid"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
       </div>
@@ -1052,7 +1052,10 @@ async function renderProgramas() {
   const grid = document.getElementById('prog-teacher-grid');
   if (!grid) return;
   const search = (document.getElementById('f-prog-search')?.value || '').toLowerCase();
-  const filtered = teachers.filter(t => t.active !== false && (!search || t.name.toLowerCase().includes(search)));
+  const colegiadoFiltro = document.getElementById('f-prog-colegiado')?.value || '';
+  const filtered = teachers.filter(t => t.active !== false
+    && (!search || t.name.toLowerCase().includes(search))
+    && (!colegiadoFiltro || t.colegiado === colegiadoFiltro));
   if (!filtered.length) { grid.innerHTML = '<div class="empty"><p>No se encontraron docentes</p></div>'; return; }
   grid.innerHTML = '<div class="loading"><div class="spinner"></div>Cargando...</div>';
   let allVals = [];
@@ -1064,7 +1067,7 @@ async function renderProgramas() {
     return `<div class="teacher-card" onclick="openTeacherProgramas('${t.name.replace(/'/g,"\\'")}')">
       <div class="tc-header">
         <div class="tc-avatar">${initials(t.name)}</div>
-        <div><div class="tc-name">${t.name}</div><div class="tc-total">Ver programas</div></div>
+        <div><div class="tc-name">${t.name}</div><div class="tc-total">${t.colegiado || 'Sin colegiado'}</div></div>
       </div>
       <div class="tc-bars">
         <div class="tc-bar-row"><span class="tc-bar-lbl">Apr.</span>
@@ -1517,6 +1520,10 @@ function renderGestionar(){
   document.getElementById('teachers-list').innerHTML=teachers.length
     ?teachers.map(t=>`<div class="manage-item${t.active?'':' inactive'}">
         <span>${t.name}</span>
+        <select class="fc" style="width:150px;margin:0;padding:6px 9px;font-size:12px" onchange="setColegiado('${t.id}',this.value)">
+          <option value="">Sin colegiado</option>
+          ${['Español','Matemáticas','Inglés','Especiales'].map(c=>`<option value="${c}"${t.colegiado===c?' selected':''}>${c}</option>`).join('')}
+        </select>
         <button class="btn btn-danger btn-sm" onclick="toggleTeacher('${t.id}',${t.active})">${t.active?'Desactivar':'Activar'}</button>
       </div>`).join('')
     :'<div class="empty"><p>No hay docentes aún</p></div>';
@@ -1531,6 +1538,7 @@ function renderGestionar(){
 async function addTeacher(){const name=document.getElementById('new-teacher-name').value.trim();if(!name)return;await sb('teachers',{method:'POST',body:JSON.stringify({name,active:true})});document.getElementById('new-teacher-name').value='';await loadTeachers();populateSelects();renderGestionar();notify('Docente agregado ✓');}
 async function addLeader(){const name=document.getElementById('new-leader-name').value.trim();if(!name)return;await sb('leaders',{method:'POST',body:JSON.stringify({name,active:true})});document.getElementById('new-leader-name').value='';await loadLeaders();populateSelects();renderGestionar();notify('Líder agregado ✓');}
 async function toggleTeacher(id,active){await sb(`teachers?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({active:!active})});await loadTeachers();populateSelects();renderGestionar();}
+async function setColegiado(id,colegiado){await sb(`teachers?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({colegiado:colegiado||null})});await loadTeachers();notify('Colegiado actualizado ✓');}
 async function toggleLeader(id,active){await sb(`leaders?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({active:!active})});await loadLeaders();populateSelects();renderGestionar();}
 
 // MODAL ACTIVITY
