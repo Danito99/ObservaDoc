@@ -285,6 +285,11 @@ textarea.fc{resize:vertical;min-height:70px}
 .challenge-meta{font-size:11px;color:var(--ink3)}
 .challenge-desc{font-size:12px;color:var(--ink2);margin-top:6px;line-height:1.4}
 .challenge-badge{font-size:10px;font-weight:600;padding:2px 9px;border-radius:99px;background:var(--amber-bg);color:var(--amber-text);white-space:nowrap}
+.mb-label{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--ink3);margin:10px 0 4px}
+.mb-row{display:flex;gap:4px;flex-wrap:wrap}
+.mb-dot{width:15px;height:15px;border-radius:50%;background:var(--paper2);flex-shrink:0}
+.mb-dot.on-a{background:var(--ch-orange)}
+.mb-dot.on-g{background:var(--violet)}
 @media(max-width:860px){.prog-grid{grid-template-columns:1fr}.hitos-grid{grid-template-columns:repeat(2,1fr)}#equipos-grid{grid-template-columns:1fr!important}}
 </style>
 </head>
@@ -662,6 +667,9 @@ textarea.fc{resize:vertical;min-height:70px}
 
       <!-- VISTA EQUIPOS -->
       <div id="prog-equipos-view" style="display:none">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+          <button class="btn btn-outline btn-sm" onclick="shareEquiposLink()">🔗 Compartir vista pública</button>
+        </div>
         <div class="prog-grid" id="equipos-grid" style="grid-template-columns:repeat(4,1fr)"></div>
         <div style="margin-top:24px">
           <div class="section-title" style="font-size:15px">Retos entre equipos</div>
@@ -1295,7 +1303,8 @@ async function renderEquipos() {
     const validadas = allVals.filter(v => nombres.includes(v.teacher_name));
     const posible = miembros.length * TOTAL_HITOS_POR_DOCENTE;
     const pct = posible ? Math.round(validadas.length / posible * 100) : 0;
-    return {col, miembros: miembros.length, validadas: validadas.length, posible, pct};
+    const achieved = new Set(validadas.map(v=>`${v.programa_id}-${v.hito_n}`));
+    return {col, miembros: miembros.length, validadas: validadas.length, posible, pct, achieved};
   });
 
   grid.innerHTML = stats.map(s => {
@@ -1307,12 +1316,20 @@ async function renderEquipos() {
       <div class="prog-bar-wrap"><div class="prog-bar" style="width:${s.pct}%"></div></div>
       <div class="prog-stats" style="margin-bottom:10px"><div class="prog-stat"><b>${s.pct}%</b><span>avance promedio</span></div></div>
       <span class="rango-pill ${r.cls}">${r.icon} ${r.label}</span>
+      ${miniBadgesHTML(s.achieved)}
       ${puedeRetar?`<div style="margin-top:12px"><button class="btn btn-outline btn-sm" style="width:100%" onclick="openChallengeModal('${s.col}')">🏴 Lanzar reto</button></div>`
         :`<div style="font-size:11px;color:var(--ink3);margin-top:12px">Alcanza 35% de avance para lanzar retos</div>`}
     </div>`;
   }).join('');
 
   renderChallengesFeed();
+}
+
+function miniBadgesHTML(achievedSet) {
+  const rowA = PROGRAMAS.aprendizaje.hitos.map(h=>`<span class="mb-dot ${achievedSet.has('aprendizaje-'+h.n)?'on-a':''}" title="${h.nombre}"></span>`).join('');
+  const rowG = PROGRAMAS.gamificacion.hitos.map(h=>`<span class="mb-dot ${achievedSet.has('gamificacion-'+h.n)?'on-g':''}" title="${h.nombre}"></span>`).join('');
+  return `<div class="mb-label">Aprendizaje Activo</div><div class="mb-row">${rowA}</div>
+          <div class="mb-label">Gamificación</div><div class="mb-row">${rowG}</div>`;
 }
 
 async function renderChallengesFeed() {
@@ -1362,6 +1379,15 @@ async function saveChallenge() {
     renderChallengesFeed();
   } catch(e) {
     notify('Error al lanzar el reto');
+  }
+}
+
+function shareEquiposLink() {
+  const url = `${window.location.origin}/equipos.html`;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(()=>notify('Liga copiada: ' + url)).catch(()=>notify(url));
+  } else {
+    notify(url);
   }
 }
 

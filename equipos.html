@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Equipos · Programas de formación · Christel House México</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ch-orange:#F59120;
+  --violet:#44579C;--violet-bg:#eef0f8;--violet-text:#344080;
+  --teal-bg:#e8f4fb;--teal-text:#1a6fa3;
+  --amber-bg:#fef3e2;--amber-text:#c4700a;
+  --ink:#414042;--ink2:#5a5758;--ink3:#8e8c8d;
+  --paper:#f7f5f2;--paper2:#ede9e4;--border:#d8d4cf;
+  --white:#ffffff;--r:10px;--r-sm:6px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Outfit',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;padding:28px}
+.wrap{max-width:1180px;margin:0 auto}
+.hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;flex-wrap:wrap;gap:10px}
+.hdr h1{font-family:'Playfair Display',serif;font-size:26px;color:var(--ink)}
+.hdr p{color:var(--ink3);font-size:13px;margin-top:4px}
+.updated{font-size:11.5px;color:var(--ink3)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+.team-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:18px}
+.team-title{font-family:'Playfair Display',serif;font-size:16px;color:var(--ink);margin-bottom:4px}
+.team-meta{font-size:11.5px;color:var(--ink3);margin-bottom:14px}
+.bar-wrap{height:6px;background:var(--paper2);border-radius:99px;overflow:hidden;margin-bottom:10px}
+.bar{height:100%;background:var(--ch-orange);border-radius:99px}
+.pct{font-size:15px;font-weight:700;color:var(--ink)}
+.pct-lbl{font-size:11px;color:var(--ink3);margin-bottom:10px}
+.rango-pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:99px;margin-bottom:6px}
+.team-rango-marineros{background:#f1f0ee;color:#6b6764}
+.team-rango-capitanes{background:var(--teal-bg);color:var(--teal-text)}
+.team-rango-almirantes{background:var(--amber-bg);color:var(--amber-text)}
+.mb-label{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--ink3);margin:10px 0 4px}
+.mb-row{display:flex;gap:4px;flex-wrap:wrap}
+.mb-dot{width:15px;height:15px;border-radius:50%;background:var(--paper2);flex-shrink:0}
+.mb-dot.on-a{background:var(--ch-orange)}
+.mb-dot.on-g{background:var(--violet)}
+.section-title{font-family:'Playfair Display',serif;font-size:16px;margin-bottom:12px}
+.challenge-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.challenge-title{font-size:13.5px;font-weight:600;color:var(--ink);margin-bottom:3px}
+.challenge-meta{font-size:11px;color:var(--ink3)}
+.challenge-desc{font-size:12px;color:var(--ink2);margin-top:6px;line-height:1.4}
+.challenge-badge{font-size:10px;font-weight:600;padding:2px 9px;border-radius:99px;background:var(--amber-bg);color:var(--amber-text);white-space:nowrap}
+.empty,.loading{text-align:center;padding:30px;color:var(--ink3);font-size:13px}
+@media(max-width:860px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <div>
+      <h1>Equipos · Programas de formación</h1>
+      <p>Ciclo 2026–27 · Christel House México · Vista pública</p>
+    </div>
+    <div class="updated" id="updated">Actualizando...</div>
+  </div>
+  <div class="grid" id="grid"><div class="loading">Cargando...</div></div>
+  <div>
+    <div class="section-title">Retos entre equipos</div>
+    <div id="feed"><div class="loading">Cargando...</div></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://sjbzlwytzqhkxfxbgpqt.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNqYnpsd3l0enFoa3hmeGJncHF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NTM3NzQsImV4cCI6MjA4OTQyOTc3NH0.GGwL1ZngD97LLPivM-QCT5yRcFBu2vGEvB_msqgFADk';
+
+const HITOS_APRENDIZAJE = ['Lanzamiento','Aumento de Ratio','The Hook','The Joy Factor','ABP — Lanzamiento','ABP — Planificación','ABP — Investigación','ABP — Presentación','ABP — Reflexión','Cierre integral'];
+const HITOS_GAMIFICACION = ['Retroalimentación viva','Metas y progreso visible','Reto graduado','Puntos con propósito','Aula social','Arquitectura del sistema','Narrativa y mundo','Economía y progresión','Misiones y boss final','Sistema completo'];
+const TOTAL_HITOS_POR_DOCENTE = 20;
+
+async function rpc(name) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+      method:'POST',
+      headers:{'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
+      body:'{}'
+    });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch(e) { return []; }
+}
+async function sbGet(path) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {headers:{'apikey':SUPABASE_KEY}});
+    if (!res.ok) return [];
+    return await res.json();
+  } catch(e) { return []; }
+}
+
+function getTeamRank(pct) {
+  if (pct>=70) return {label:'Almirantes',cls:'team-rango-almirantes',icon:'👑'};
+  if (pct>=35) return {label:'Capitanes',cls:'team-rango-capitanes',icon:'🚢'};
+  return {label:'Marineros',cls:'team-rango-marineros',icon:'⚓'};
+}
+
+function miniBadges(achieved) {
+  const rowA = HITOS_APRENDIZAJE.map((n,i)=>`<span class="mb-dot ${achieved.has('aprendizaje-'+(i+1))?'on-a':''}" title="${n}"></span>`).join('');
+  const rowG = HITOS_GAMIFICACION.map((n,i)=>`<span class="mb-dot ${achieved.has('gamificacion-'+(i+1))?'on-g':''}" title="${n}"></span>`).join('');
+  return `<div class="mb-label">Aprendizaje Activo</div><div class="mb-row">${rowA}</div>
+          <div class="mb-label">Gamificación</div><div class="mb-row">${rowG}</div>`;
+}
+
+async function load() {
+  const [progress, hitos, challenges] = await Promise.all([
+    rpc('public_team_progress'),
+    rpc('public_team_hitos'),
+    sbGet('team_challenges?order=created_at.desc&limit=20')
+  ]);
+
+  const grid = document.getElementById('grid');
+  grid.innerHTML = progress.length ? progress.map(p => {
+    const posible = p.miembros * TOTAL_HITOS_POR_DOCENTE;
+    const pct = posible ? Math.round(p.validadas/posible*100) : 0;
+    const r = getTeamRank(pct);
+    const achieved = new Set(hitos.filter(h=>h.colegiado===p.colegiado).map(h=>`${h.programa_id}-${h.hito_n}`));
+    return `<div class="team-card">
+      <div class="team-title">${p.colegiado}</div>
+      <div class="team-meta">${p.miembros} docente${p.miembros==1?'':'s'} · ${p.validadas}/${posible} hitos validados</div>
+      <div class="bar-wrap"><div class="bar" style="width:${pct}%"></div></div>
+      <div class="pct">${pct}%</div>
+      <div class="pct-lbl">avance promedio</div>
+      <span class="rango-pill ${r.cls}">${r.icon} ${r.label}</span>
+      ${miniBadges(achieved)}
+    </div>`;
+  }).join('') : '<div class="empty">Sin datos todavía</div>';
+
+  const feed = document.getElementById('feed');
+  feed.innerHTML = challenges.length ? challenges.map(c => `
+    <div class="challenge-card">
+      <div style="flex:1">
+        <div class="challenge-title">${c.title}</div>
+        <div class="challenge-meta">${c.from_colegiado} → ${c.to_colegiado || 'Todos los equipos'} · ${new Date(c.created_at).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}</div>
+        ${c.description?`<div class="challenge-desc">${c.description}</div>`:''}
+      </div>
+      <span class="challenge-badge">${c.status==='activo'?'Activo':'Cerrado'}</span>
+    </div>`).join('') : '<div class="empty">Ningún equipo ha lanzado retos todavía</div>';
+
+  document.getElementById('updated').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+}
+
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
