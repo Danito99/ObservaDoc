@@ -273,7 +273,19 @@ textarea.fc{resize:vertical;min-height:70px}
 .hito:not(.logrado) .hito-status{background:var(--paper2);color:var(--ink3)}
 .bloque-sep{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);grid-column:1/-1;padding:4px 0 2px;border-top:1px solid var(--border);margin-top:4px}
 .bloque-sep:first-child{border-top:none;margin-top:0;padding-top:0}
-@media(max-width:860px){.prog-grid{grid-template-columns:1fr}.hitos-grid{grid-template-columns:repeat(2,1fr)}}
+/* EQUIPOS / RETOS */
+.team-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:18px}
+.team-card .prog-title{font-size:15.5px}
+.team-meta{font-size:11.5px;color:var(--ink3);margin-bottom:14px}
+.team-rango-marineros{background:#f1f0ee;color:#6b6764}
+.team-rango-capitanes{background:var(--teal-bg);color:var(--teal-text)}
+.team-rango-almirantes{background:var(--amber-bg);color:var(--amber-text)}
+.challenge-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.challenge-title{font-size:13.5px;font-weight:600;color:var(--ink);margin-bottom:3px}
+.challenge-meta{font-size:11px;color:var(--ink3)}
+.challenge-desc{font-size:12px;color:var(--ink2);margin-top:6px;line-height:1.4}
+.challenge-badge{font-size:10px;font-weight:600;padding:2px 9px;border-radius:99px;background:var(--amber-bg);color:var(--amber-text);white-space:nowrap}
+@media(max-width:860px){.prog-grid{grid-template-columns:1fr}.hitos-grid{grid-template-columns:repeat(2,1fr)}#equipos-grid{grid-template-columns:1fr!important}}
 </style>
 </head>
 <body>
@@ -642,7 +654,21 @@ textarea.fc{resize:vertical;min-height:70px}
     <div class="page" id="page-programas">
       <div class="ph">
         <div class="ph-left"><h2>Programas de formación</h2><p>Ciclo 2026–27 · Hitos validados por observación de aula</p></div>
+        <div class="vtabs">
+          <button class="vtab active" id="vt-prog-docentes" onclick="switchProgView('docentes')">◉ Docentes</button>
+          <button class="vtab" id="vt-prog-equipos" onclick="switchProgView('equipos')">⚓ Equipos</button>
+        </div>
       </div>
+
+      <!-- VISTA EQUIPOS -->
+      <div id="prog-equipos-view" style="display:none">
+        <div class="prog-grid" id="equipos-grid" style="grid-template-columns:repeat(4,1fr)"></div>
+        <div style="margin-top:24px">
+          <div class="section-title" style="font-size:15px">Retos entre equipos</div>
+          <div id="challenges-feed"></div>
+        </div>
+      </div>
+
       <!-- LISTA DE DOCENTES -->
       <div id="prog-list-view">
         <div class="filters" style="margin-bottom:14px">
@@ -776,6 +802,37 @@ textarea.fc{resize:vertical;min-height:70px}
     <div class="modal-ftr">
       <button class="btn btn-outline" onclick="closeModal('modal-hito')">Cancelar</button>
       <button class="btn btn-primary" id="hito-modal-save-btn" onclick="saveHitoValidation()">Validar hito</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RETO ENTRE EQUIPOS -->
+<div class="modal-overlay" id="modal-challenge">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3>Lanzar reto</h3>
+      <button class="modal-close" onclick="closeModal('modal-challenge')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:14px" id="challenge-from-label"></div>
+      <div class="fg">
+        <label class="flbl">Dirigido a</label>
+        <select class="fc" id="ch-target">
+          <option value="">Todos los equipos</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="flbl">Título del reto <span>*</span></label>
+        <input class="fc" type="text" id="ch-title" placeholder="Ej. ¿Quién implementa Aula social en 3 grupos este mes?">
+      </div>
+      <div class="fg">
+        <label class="flbl">Descripción</label>
+        <textarea class="fc" id="ch-desc" placeholder="Detalles, criterio de éxito, plazo..."></textarea>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn btn-outline" onclick="closeModal('modal-challenge')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveChallenge()">Lanzar reto</button>
     </div>
   </div>
 </div>
@@ -957,7 +1014,7 @@ function nav(page) {
   if (page==='micalendario') renderMyCalendar();
   if (page==='gestionar') renderGestionar();
   if (page==='coaching') renderCoachingList();
-  if (page==='programas') renderProgramas();
+  if (page==='programas') switchProgView('docentes');
 }
 
 // ===== PROGRAMAS DE FORMACIÓN =====
@@ -1202,6 +1259,109 @@ async function saveHitoValidation() {
     notify('Error al guardar. Verifica tu conexión.');
   } finally {
     btn.disabled=false; btn.textContent='Validar hito';
+  }
+}
+
+// ===== EQUIPOS / RETOS =====
+const COLEGIADOS = ['Español','Matemáticas','Inglés','Especiales'];
+const TOTAL_HITOS_POR_DOCENTE = 20; // 10 aprendizaje + 10 gamificación
+
+function switchProgView(view) {
+  document.getElementById('vt-prog-docentes').classList.toggle('active', view==='docentes');
+  document.getElementById('vt-prog-equipos').classList.toggle('active', view==='equipos');
+  document.getElementById('prog-list-view').style.display = view==='docentes' ? '' : 'none';
+  document.getElementById('prog-detail-view').style.display = 'none';
+  document.getElementById('prog-equipos-view').style.display = view==='equipos' ? '' : 'none';
+  if (view==='docentes') renderProgramas();
+  else renderEquipos();
+}
+
+function getTeamRank(pct) {
+  if (pct>=70) return {label:'Almirantes',cls:'team-rango-almirantes',icon:'👑'};
+  if (pct>=35) return {label:'Capitanes',cls:'team-rango-capitanes',icon:'🚢'};
+  return {label:'Marineros',cls:'team-rango-marineros',icon:'⚓'};
+}
+
+async function renderEquipos() {
+  const grid = document.getElementById('equipos-grid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="loading"><div class="spinner"></div>Cargando...</div>';
+  let allVals = [];
+  try { allVals = await sb('badge_validations?ciclo_escolar=eq.2026-2027&validated=eq.true&select=teacher_name,programa_id,hito_n'); } catch(e) {}
+
+  const stats = COLEGIADOS.map(col => {
+    const miembros = teachers.filter(t => t.active!==false && t.colegiado===col);
+    const nombres = miembros.map(m=>m.name);
+    const validadas = allVals.filter(v => nombres.includes(v.teacher_name));
+    const posible = miembros.length * TOTAL_HITOS_POR_DOCENTE;
+    const pct = posible ? Math.round(validadas.length / posible * 100) : 0;
+    return {col, miembros: miembros.length, validadas: validadas.length, posible, pct};
+  });
+
+  grid.innerHTML = stats.map(s => {
+    const r = getTeamRank(s.pct);
+    const puedeRetar = s.pct>=35 && s.miembros>0;
+    return `<div class="team-card">
+      <div class="prog-title">${s.col}</div>
+      <div class="team-meta">${s.miembros} docente${s.miembros===1?'':'s'} · ${s.validadas}/${s.posible} hitos validados</div>
+      <div class="prog-bar-wrap"><div class="prog-bar" style="width:${s.pct}%"></div></div>
+      <div class="prog-stats" style="margin-bottom:10px"><div class="prog-stat"><b>${s.pct}%</b><span>avance promedio</span></div></div>
+      <span class="rango-pill ${r.cls}">${r.icon} ${r.label}</span>
+      ${puedeRetar?`<div style="margin-top:12px"><button class="btn btn-outline btn-sm" style="width:100%" onclick="openChallengeModal('${s.col}')">🏴 Lanzar reto</button></div>`
+        :`<div style="font-size:11px;color:var(--ink3);margin-top:12px">Alcanza 35% de avance para lanzar retos</div>`}
+    </div>`;
+  }).join('');
+
+  renderChallengesFeed();
+}
+
+async function renderChallengesFeed() {
+  const feed = document.getElementById('challenges-feed');
+  if (!feed) return;
+  feed.innerHTML = '<div class="loading"><div class="spinner"></div>Cargando...</div>';
+  let challenges = [];
+  try { challenges = await sb('team_challenges?order=created_at.desc&limit=20'); } catch(e) {}
+  if (!challenges.length) { feed.innerHTML = '<div class="empty"><p>Ningún equipo ha lanzado retos todavía</p></div>'; return; }
+  feed.innerHTML = challenges.map(c => `
+    <div class="challenge-card">
+      <div style="flex:1">
+        <div class="challenge-title">${c.title}</div>
+        <div class="challenge-meta">${c.from_colegiado} → ${c.to_colegiado || 'Todos los equipos'} · ${new Date(c.created_at).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}</div>
+        ${c.description?`<div class="challenge-desc">${c.description}</div>`:''}
+      </div>
+      <span class="challenge-badge">${c.status==='activo'?'Activo':'Cerrado'}</span>
+    </div>`).join('');
+}
+
+function openChallengeModal(fromColegiado) {
+  document.getElementById('challenge-from-label').textContent = `Lanzando reto desde: ${fromColegiado}`;
+  document.getElementById('ch-target').innerHTML = '<option value="">Todos los equipos</option>'
+    + COLEGIADOS.filter(c=>c!==fromColegiado).map(c=>`<option value="${c}">${c}</option>`).join('');
+  document.getElementById('ch-title').value = '';
+  document.getElementById('ch-desc').value = '';
+  document.getElementById('modal-challenge').dataset.from = fromColegiado;
+  openModal('modal-challenge');
+}
+
+async function saveChallenge() {
+  const from = document.getElementById('modal-challenge').dataset.from;
+  const title = document.getElementById('ch-title').value.trim();
+  if (!title) { notify('Escribe un título para el reto'); return; }
+  const payload = {
+    from_colegiado: from,
+    to_colegiado: document.getElementById('ch-target').value || null,
+    title,
+    description: document.getElementById('ch-desc').value.trim(),
+    created_by: currentProfile?.name || currentUser?.email || '',
+    status: 'activo'
+  };
+  try {
+    await sb('team_challenges', {method:'POST', body:JSON.stringify(payload)});
+    closeModal('modal-challenge');
+    notify('🏴 Reto lanzado');
+    renderChallengesFeed();
+  } catch(e) {
+    notify('Error al lanzar el reto');
   }
 }
 
