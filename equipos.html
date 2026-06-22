@@ -9,7 +9,7 @@
 <style>
 :root{
   --ch-orange:#F59120;
-  --violet:#44579C;--violet-bg:#eef0f8;--violet-text:#344080;
+  --violet:#44579C;--violet-bg:#eef0f8;--violet-text:#344080;--lab-green:#2e8b5b;
   --teal-bg:#e8f4fb;--teal-text:#1a6fa3;
   --amber-bg:#fef3e2;--amber-text:#c4700a;
   --ink:#414042;--ink2:#5a5758;--ink3:#8e8c8d;
@@ -39,7 +39,7 @@ body{font-family:'Outfit',sans-serif;background:var(--paper);color:var(--ink);mi
 .mb-row{display:flex;gap:4px;flex-wrap:wrap}
 .mb-dot{width:15px;height:15px;border-radius:50%;background:var(--paper2);flex-shrink:0}
 .mb-dot.on-a{background:var(--ch-orange)}
-.mb-dot.on-g{background:var(--violet)}
+.mb-dot.on-g{background:var(--violet)}.mb-dot.on-l{background:var(--lab-green)}
 .section-title{font-family:'Playfair Display',serif;font-size:16px;margin-bottom:12px}
 .challenge-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
 .challenge-title{font-size:13.5px;font-weight:600;color:var(--ink);margin-bottom:3px}
@@ -72,7 +72,8 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 const HITOS_APRENDIZAJE = ['Lanzamiento','Aumento de Ratio','The Hook','The Joy Factor','ABP — Lanzamiento','ABP — Planificación','ABP — Investigación','ABP — Presentación','ABP — Reflexión','Cierre integral'];
 const HITOS_GAMIFICACION = ['Retroalimentación viva','Metas y progreso visible','Reto graduado','Puntos con propósito','Aula social','Arquitectura del sistema','Narrativa y mundo','Economía y progresión','Misiones y boss final','Sistema completo'];
-const TOTAL_HITOS_POR_DOCENTE = 20;
+const HITOS_LAB = ['Cortadora láser','Diseño digital','Construcción','Robótica','Crafting','Clase en el Lab'];
+const TOTAL_HITOS_POR_DOCENTE = 26;
 
 async function rpc(name) {
   try {
@@ -102,8 +103,10 @@ function getTeamRank(pct) {
 function miniBadges(achieved) {
   const rowA = HITOS_APRENDIZAJE.map((n,i)=>`<span class="mb-dot ${achieved.has('aprendizaje-'+(i+1))?'on-a':''}" title="${n}"></span>`).join('');
   const rowG = HITOS_GAMIFICACION.map((n,i)=>`<span class="mb-dot ${achieved.has('gamificacion-'+(i+1))?'on-g':''}" title="${n}"></span>`).join('');
+  const rowL = HITOS_LAB.map((n,i)=>`<span class="mb-dot ${achieved.has('lab-'+(i+1))?'on-l':''}" title="${n}"></span>`).join('');
   return `<div class="mb-label">Aprendizaje Activo</div><div class="mb-row">${rowA}</div>
-          <div class="mb-label">Gamificación</div><div class="mb-row">${rowG}</div>`;
+          <div class="mb-label">Gamificación</div><div class="mb-row">${rowG}</div>
+          <div class="mb-label">Innovation Lab</div><div class="mb-row">${rowL}</div>`;
 }
 
 async function load() {
