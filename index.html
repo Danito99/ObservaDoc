@@ -3241,12 +3241,34 @@ let foStep = 1, foSelectedDomain = null, foSelectedAspecto = null, foIndicators 
 
 // Batería extra de Innovación y Tecnología: visible en todos los dominios, solo para este perfil
 const FO_TECH_EMAIL = 'despinosa@mx.christelhouse.org';
-const FO_TECH_ASPECTO = 'Tecnología e innovación';
-const FO_TECH_INDICATORS = ["La tecnología usada modifica la actividad o la enriquece — no simplemente la sustituye por una versión digital", "Los alumnos usan tecnología para producir, resolver o crear, no solo para consumir información", "El docente usa tecnología para obtener evidencia de aprendizaje en tiempo real (formularios, respuestas digitales, autoevaluaciones)", "La herramienta tecnológica elegida tiene sentido para el objetivo de la clase — no es aleatoria ni decorativa", "Los alumnos saben para qué están usando la tecnología en este momento", "La tecnología amplía lo que sería posible sin ella — no solo acelera lo mismo", "Los materiales están diseñados para generar interés genuino — no son recursos genéricos o bajados sin adaptación", "La estructura de la clase rompe el esquema expositivo tradicional en algún momento (estaciones, retos, juegos, proyectos, debates)", "El espacio físico está siendo aprovechado intencionalmente para el aprendizaje — no todo ocurre desde el escritorio o el pizarrón", "Hay una técnica de aprendizaje activo claramente identificable en algún momento de la clase", "Los alumnos tienen agencia — toman decisiones sobre cómo o qué aprender, o cómo demostrar lo aprendido", "El nivel de interés y participación de los alumnos es notablemente alto para este grupo en este momento"];
+const FO_INNOVACION_ASPECTO = 'Innovación en el aula';
+const FO_INNOVACION_INDICATORS = ["La actividad plantea a los alumnos investigar, crear o resolver algo con propósito real — no es solo exponer y ejercitar", "Los alumnos toman decisiones sobre cómo o qué aprenden, o sobre cómo demuestran lo que aprendieron", "Aun cuando el trabajo es autónomo o autogestionado, la docente sigue enseñando: circula, pregunta, retroalimenta y detecta a quien se atora", "Los alumnos expresan ideas de forma original y con sustancia (un producto, un argumento, una representación)", "Los alumnos construyen algo en conjunto con interdependencia real — no trabajan en paralelo bajo el mismo techo"];
+const FO_TECNOLOGIA_ASPECTO = 'Tecnología con propósito';
+const FO_TECNOLOGIA_INDICATORS = ["La herramienta digital sirve directamente al objetivo de la clase y los alumnos saben para qué la usan — no es decorativa", "La tecnología permite hacer algo difícil o imposible sin ella (crear, modelar, programar, colaborar en tiempo real) — no solo digitaliza lo mismo", "Los alumnos usan la tecnología para producir o crear, no solo para consumir información", "La docente usa tecnología para obtener evidencia del aprendizaje en el momento y ajustar la clase"];
+
+// Anclas 0–3 por indicador (mismo orden que los arreglos de arriba)
+const FO_ANCLAS = {
+  [FO_INNOVACION_ASPECTO]: [
+    ['Clase totalmente expositiva; los alumnos solo escuchan o copian', 'Hay actividad, pero mecánica (repetir, llenar) y sin propósito claro', 'Los alumnos investigan o resuelven, pero la tarea es artificial o desconectada de contextos reales', 'Los alumnos crean, investigan o resuelven un problema con propósito auténtico o conexión real'],
+    ['Todo lo decide la docente; una sola ruta y una sola respuesta válida', 'Elección cosmética (color, orden) sin efecto en el aprendizaje', 'Los alumnos eligen dentro de opciones acotadas por la docente', 'Los alumnos deciden ruta, formato o cómo demuestran lo aprendido'],
+    ['La docente se retira o solo administra mientras la actividad "corre sola"', 'Supervisa de lejos; interviene solo por disciplina o dudas técnicas', 'Interviene con contenido, pero de forma reactiva o desigual (solo a quien pregunta)', 'Circula con intención: cuestiona, retroalimenta y detecta a quien se atora, incluso en trabajo autónomo'],
+    ['No hay espacio para expresión propia; una única forma correcta', 'Creatividad superficial (decorar) sin sustancia', 'Expresan ideas con cierta libertad de formato', 'Comunican ideas o conexiones de forma original y con sustancia'],
+    ['Trabajo individual, o "equipos" que trabajan en paralelo', 'Agrupados pero sin interdependencia: uno hace, los demás miran', 'Colaboran, pero los roles o aportes son desiguales o difusos', 'Construyen algo juntos con interdependencia real; el producto es colectivo'],
+  ],
+  [FO_TECNOLOGIA_ASPECTO]: [
+    ['La tecnología no se conecta con el objetivo, o distrae de él', 'Se usa por usarse; los alumnos no saben para qué', 'Apoya el objetivo, pero de forma parcial o subaprovechada', 'Sirve directamente al objetivo y los alumnos saben para qué la usan'],
+    ['Digitaliza lo mismo (leer un PDF en lugar del libro)', 'Sustitución con leve mejora (buscador, corrección automática)', 'Modifica la tarea (interactividad, retroalimentación inmediata) sin cambiar su naturaleza', 'Redefine: habilita crear, modelar, computar o colaborar en tiempo real; inviable sin ella'],
+    ['Los alumnos solo consumen (ven un video, leen la pantalla)', 'Interacción guiada mínima (responden, dan clic)', 'Usan la tecnología para practicar o reorganizar información', 'Diseñan, programan, modelan o crean un producto propio con la tecnología'],
+    ['No se recoge evidencia del aprendizaje durante la sesión', 'Evidencia informal (preguntas al aire) sin registro ni uso', 'Recoge respuestas con alguna herramienta, pero no ajusta con ellas', 'Obtiene evidencia en tiempo real y ajusta, o da vías alternativas para demostrar el aprendizaje'],
+  ],
+};
 
 function getFOAspectos(dom) {
   const entries = Object.entries(dom?.aspectos || {});
-  if (currentUser?.email === FO_TECH_EMAIL) entries.push([FO_TECH_ASPECTO, FO_TECH_INDICATORS]);
+  if (currentUser?.email === FO_TECH_EMAIL) {
+    entries.push([FO_INNOVACION_ASPECTO, FO_INNOVACION_INDICATORS]);
+    entries.push([FO_TECNOLOGIA_ASPECTO, FO_TECNOLOGIA_INDICATORS]);
+  }
   return entries;
 }
 
@@ -3333,8 +3355,10 @@ function renderFOStep(a) {
             </div>
             ${inds.map((ind, i) => {
               const gi = startIdx + i;
+              const anclas = FO_ANCLAS[asp]?.[i];
               return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
                 <div style="font-size:12.5px;color:var(--ink);margin-bottom:7px;line-height:1.5">${i+1}. ${ind}</div>
+                ${anclas ? `<div style="font-size:10.5px;color:var(--ink3);line-height:1.5;margin-bottom:8px;background:var(--paper);border-radius:var(--r-sm);padding:6px 8px">${anclas.map((a,v)=>`<div><b>${v}</b> — ${a}</div>`).join('')}</div>` : ''}
                 ${scaleHTML('fo_ind', gi)}
               </div>`;
             }).join('')}
