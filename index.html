@@ -2152,6 +2152,10 @@ function renderRptOverview() {
 }
 
 // ---- FO DASHBOARD ----
+function foDomIndicatorCount(dominio) {
+  return Object.values(FORM_DATA.fo.dominios[dominio]?.aspectos || {}).flat().length;
+}
+
 function renderRptFO() {
   const panel = document.getElementById('rpt-fo-panel');
   const data = filterRptData(rptData.fo, 'fo');
@@ -2159,14 +2163,15 @@ function renderRptFO() {
 
   const avgVal = data.filter(d=>d.valoracion_general!=null).reduce((a,d)=>a+d.valoracion_general,0)/(data.filter(d=>d.valoracion_general!=null).length||1);
 
-  // Por dominio
+  // Por dominio (solo indicadores institucionales; excluye la batería personal de Innovación/Tecnología)
   const domData = {};
   ['D1','D2','D3','D4','D5'].forEach(d=>domData[d]={sum:0,cnt:0,forms:0});
   data.forEach(f=>{
     if(!domData[f.dominio]) return;
     domData[f.dominio].forms++;
+    const domCount = foDomIndicatorCount(f.dominio);
     const r = typeof f.respuestas==='string'?JSON.parse(f.respuestas):f.respuestas||{};
-    Object.values(r).forEach(v=>{domData[f.dominio].sum+=Number(v);domData[f.dominio].cnt++;});
+    Object.entries(r).forEach(([k,v])=>{ if(Number(k)<domCount){domData[f.dominio].sum+=Number(v);domData[f.dominio].cnt++;} });
   });
 
   // Por docente
@@ -2174,8 +2179,9 @@ function renderRptFO() {
   data.forEach(d=>{
     if(!byTeacher[d.teacher_name])byTeacher[d.teacher_name]={sum:0,cnt:0,forms:0,doms:{}};
     byTeacher[d.teacher_name].forms++;
+    const domCount = foDomIndicatorCount(d.dominio);
     const r = typeof d.respuestas==='string'?JSON.parse(d.respuestas):d.respuestas||{};
-    Object.values(r).forEach(v=>{byTeacher[d.teacher_name].sum+=Number(v);byTeacher[d.teacher_name].cnt++;});
+    Object.entries(r).forEach(([k,v])=>{ if(Number(k)<domCount){byTeacher[d.teacher_name].sum+=Number(v);byTeacher[d.teacher_name].cnt++;} });
     if(!byTeacher[d.teacher_name].doms[d.dominio]) byTeacher[d.teacher_name].doms[d.dominio]=0;
     byTeacher[d.teacher_name].doms[d.dominio]++;
   });
@@ -2187,8 +2193,9 @@ function renderRptFO() {
     const act=activities.find(a=>a.id===d.activity_id);
     const m=act?.month;
     if(m&&byMonth[m]){
+      const domCount = foDomIndicatorCount(d.dominio);
       const r=typeof d.respuestas==='string'?JSON.parse(d.respuestas):d.respuestas||{};
-      Object.values(r).forEach(v=>{byMonth[m].sum+=Number(v);byMonth[m].cnt++;});
+      Object.entries(r).forEach(([k,v])=>{ if(Number(k)<domCount){byMonth[m].sum+=Number(v);byMonth[m].cnt++;} });
     }
   });
   const monthAvgs = MONTHS_RPT.map(m=>byMonth[m].cnt>0?(byMonth[m].sum/byMonth[m].cnt).toFixed(2):0);
@@ -2239,6 +2246,50 @@ function renderRptFO() {
   if(domCounts.length) html += vizCard('Frecuencia de observación por dominio',
     `<div style="padding:4px 0">${svgBar(domCounts.map(([,v])=>v.forms), domCounts.map(([d])=>d), Object.values(DOM_COLORS_RPT), maxDomForms, 110)}</div>`,
     '#44579C');
+
+  // Innovación y Tecnología — batería personal, solo visible y calculada para este perfil
+  if (currentUser?.email === FO_TECH_EMAIL) {
+    const innovStats = {sum:0,cnt:0,forms:0}, tecStats = {sum:0,cnt:0,forms:0};
+    data.forEach(f=>{
+      const domCount = foDomIndicatorCount(f.dominio);
+      const r = typeof f.respuestas==='string'?JSON.parse(f.respuestas):f.respuestas||{};
+      let hasInnov=false, hasTec=false;
+      FO_INNOVACION_INDICATORS.forEach((_,i)=>{
+        const v = r[domCount+i];
+        if(v!==undefined && v!==null){innovStats.sum+=Number(v);innovStats.cnt++;hasInnov=true;}
+      });
+      FO_TECNOLOGIA_INDICATORS.forEach((_,i)=>{
+        const v = r[domCount+FO_INNOVACION_INDICATORS.length+i];
+        if(v!==undefined && v!==null){tecStats.sum+=Number(v);tecStats.cnt++;hasTec=true;}
+      });
+      if(hasInnov) innovStats.forms++;
+      if(hasTec) tecStats.forms++;
+    });
+    if(innovStats.cnt>0 || tecStats.cnt>0){
+      const innovAvg = innovStats.cnt?innovStats.sum/innovStats.cnt:0;
+      const tecAvg = tecStats.cnt?tecStats.sum/tecStats.cnt:0;
+      html += vizCard('Innovación y Tecnología (evaluación personal)',
+        `<div style="display:flex;justify-content:space-around;padding:8px 0">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+            <div style="position:relative">
+              ${svgDonut(innovAvg/3*100, '#0d9488', 68, 9)}
+              <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--ink)">${innovAvg.toFixed(1)}</div>
+            </div>
+            <div style="font-size:10px;color:var(--ink3);text-align:center;max-width:70px">Innovación en el aula</div>
+            <div style="font-size:9.5px;color:var(--ink3)">${innovStats.forms} sesiones</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+            <div style="position:relative">
+              ${svgDonut(tecAvg/3*100, '#7c3aed', 68, 9)}
+              <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--ink)">${tecAvg.toFixed(1)}</div>
+            </div>
+            <div style="font-size:10px;color:var(--ink3);text-align:center;max-width:70px">Tecnología con propósito</div>
+            <div style="font-size:9.5px;color:var(--ink3)">${tecStats.forms} sesiones</div>
+          </div>
+        </div>`,
+        '#0d9488');
+    }
+  }
 
   panel.innerHTML = html;
 }
