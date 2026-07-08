@@ -3289,6 +3289,7 @@ function getScaleValues(prefix, count) {
 
 // ---- FO FORM ----
 let foStep = 1, foSelectedDomain = null, foSelectedAspecto = null, foIndicators = [], foPrefix = 'fo';
+let foRespuestas = {}, foNotas = {};
 
 // Batería extra de Innovación y Tecnología: visible en todos los dominios, solo para este perfil
 const FO_TECH_EMAIL = 'despinosa@mx.christelhouse.org';
@@ -3324,7 +3325,7 @@ function getFOAspectos(dom) {
 }
 
 function buildFormFO(a) {
-  foStep = 1; foSelectedDomain = null; foSelectedAspecto = null;
+  foStep = 1; foSelectedDomain = null; foSelectedAspecto = null; foRespuestas = {}; foNotas = {};
   renderFOStep(a);
 }
 
@@ -3517,6 +3518,10 @@ function foNext() {
     // Check at least one indicator was filled
     const filled = foIndicators.some((_, i) => document.querySelector(`input[name="fo_ind_${i}"]:checked`));
     if (!filled) { notify('Completa al menos un indicador antes de continuar'); return; }
+    // Capturar respuestas/notas ANTES de que el paso 4 reemplace este HTML
+    const captured = getScaleValues('fo_ind', foIndicators.length);
+    foRespuestas = captured.respuestas;
+    foNotas = captured.notas;
     foStep = 4;
   }
   renderFOStep(currentFormActivity);
@@ -3526,7 +3531,7 @@ async function submitFO() {
   const bien = document.getElementById('fo-bien')?.value.trim();
   const mejorar = document.getElementById('fo-mejorar')?.value.trim();
   if (!bien || !mejorar) { notify('Completa la reflexión final'); return; }
-  const {respuestas, notas} = getScaleValues('fo_ind', foIndicators.length);
+  const respuestas = foRespuestas, notas = foNotas;
   const valoracionEl = document.querySelector('input[name="fo_valoracion"]:checked');
   const btn = document.getElementById('fo-submit-btn');
   btn.textContent = 'Guardando...'; btn.disabled = true;
