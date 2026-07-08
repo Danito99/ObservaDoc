@@ -296,13 +296,29 @@ textarea.fc{resize:vertical;min-height:70px}
 .mobile-menu-btn{display:none}
 .sidebar-overlay{display:none}
 @media(max-width:860px){
-  .mobile-menu-btn{display:flex;align-items:center;justify-content:center;position:fixed;top:14px;left:14px;z-index:60;width:38px;height:38px;border-radius:var(--r-sm);background:#1f1e1f;color:#fff;border:none;font-size:18px;cursor:pointer;box-shadow:var(--shadow)}
+  .mobile-menu-btn{display:flex;align-items:center;justify-content:center;position:fixed;top:14px;left:14px;z-index:60;width:44px;height:44px;border-radius:var(--r-sm);background:#1f1e1f;color:#fff;border:none;font-size:18px;cursor:pointer;box-shadow:var(--shadow)}
   .sidebar{transform:translateX(-100%);transition:transform .2s ease;z-index:100}
   .sidebar.open{transform:translateX(0)}
   .main{margin-left:0;padding:70px 16px 20px}
   .sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:90}
   .sidebar-overlay.open{display:block}
   .stats{grid-template-columns:repeat(2,1fr)}
+
+  /* TOUCH TARGETS */
+  .nav-item{padding:12px 10px;font-size:14px;min-height:44px}
+  .logout-btn{padding:11px 9px;min-height:44px}
+  .modal-close{width:40px;height:40px}
+  .cal-nav-btn{width:40px;height:40px}
+  .btn{padding:11px 16px;min-height:44px}
+  .btn-sm{padding:9px 14px;min-height:40px}
+  .btn-ghost{padding:9px 12px;min-height:40px}
+  .vtab{padding:10px 14px;min-height:40px}
+  .fsel,.fsearch{padding:11px 12px;min-height:44px}
+  .scale-radio-btn{padding:12px 4px!important}
+
+  /* SCROLLABLE TABLES */
+  #act-table-wrap,#dash-upcoming,#dd-table,#my-upcoming,.card:has(>table.tbl){overflow-x:auto}
+  .tbl{min-width:600px}
 }
 @media(max-width:480px){
   .stats{grid-template-columns:1fr}
@@ -1798,6 +1814,20 @@ function openNew(){
   openModal('modal-act');
 }
 
+// Abre el modal de nueva actividad prellenado con la fecha de seguimiento de un Feedback/Modelaje,
+// para que el líder elija de una vez qué tipo de actividad (LW/FO/FB/MC) da seguimiento.
+function openFollowUpModal(teacherName, leaderName, date){
+  document.getElementById('edit-id').value='';
+  document.getElementById('modal-title').textContent='Actividad de seguimiento';
+  document.getElementById('m-date').value=date;
+  document.getElementById('m-notes').value='';document.getElementById('m-evidence').value='';
+  document.getElementById('m-start-time').value='';document.getElementById('m-end-time').value='';
+  document.getElementById('m-status').value='pending';document.getElementById('m-type').value='LW';
+  document.getElementById('m-teacher').innerHTML=teachers.map(t=>`<option value="${t.id}|${t.name}"${t.name===teacherName?' selected':''}>${t.name}</option>`).join('');
+  document.getElementById('m-leader').innerHTML=leaders.map(l=>`<option value="${l.id}|${l.name}"${l.name===leaderName?' selected':''}>${l.name}</option>`).join('');
+  openModal('modal-act');
+}
+
 function openEdit(a){
   document.getElementById('edit-id').value=a.id;
   document.getElementById('modal-title').textContent='Editar actividad';
@@ -2541,102 +2571,6 @@ function switchRptTab(tab) {
   renderReportes();
 }
 // ===================== END REPORTES =====================
-
-function renderRptLW() {
-  const panel = document.getElementById('rpt-lw-panel');
-  const data = filterRptData(rptData.lw, 'lw');
-  if (!data.length) { panel.innerHTML = '<div class="empty"><div class="empty-icon">◌</div><p>No hay datos de Learning Walk con estos filtros</p></div>'; return; }
-
-  // Build flat indicator list
-  const allInds = [];
-  Object.entries(LW_SECCIONES).forEach(([sec, inds]) => inds.forEach((ind,i) => allInds.push({sec, ind})));
-
-  // Count Si/No per indicator
-  const counts = allInds.map(({ind,sec},gi) => {
-    let si=0, no=0;
-    data.forEach(d => { const r = d.respuestas?.[gi]; if(r==='Sí')si++; else if(r==='No')no++; });
-    return {ind, sec, si, no, total: si+no};
-  });
-
-  const totalForms = data.length;
-  const avgSi = counts.reduce((a,c) => a + (c.total>0?c.si/c.total:0), 0) / counts.length * 100;
-
-  // Worst indicators (most No)
-  const worst = [...counts].filter(c=>c.total>0).sort((a,b)=>(b.no/b.total)-(a.no/a.total)).slice(0,5);
-  const best = [...counts].filter(c=>c.total>0).sort((a,b)=>(b.si/b.total)-(a.si/a.total)).slice(0,5);
-
-  // By teacher
-  const byTeacher = {};
-  data.forEach(d => {
-    if(!byTeacher[d.teacher_name]) byTeacher[d.teacher_name] = {si:0,total:0,count:0};
-    counts.forEach((_,gi) => {
-      const r = d.respuestas?.[gi];
-      if(r==='Sí'){byTeacher[d.teacher_name].si++;byTeacher[d.teacher_name].total++;}
-      else if(r==='No'){byTeacher[d.teacher_name].total++;}
-    });
-    byTeacher[d.teacher_name].count++;
-  });
-
-  // By month trend
-  const byMonth = {};
-  const MONTHS = ['SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE','ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO'];
-  data.forEach(d => {
-    const act = activities.find(a=>a.id===d.activity_id);
-    const m = act?.month || '?';
-    if(!byMonth[m]) byMonth[m] = {si:0,total:0};
-    counts.forEach((_,gi) => {
-      const r = d.respuestas?.[gi];
-      if(r==='Sí'){byMonth[m].si++;byMonth[m].total++;}
-      else if(r==='No'){byMonth[m].total++;}
-    });
-  });
-
-  let html = metricCards([
-    {label:'LW registrados', value:totalForms, color:'#0d9488'},
-    {label:'Promedio de Sí', value:Math.round(avgSi)+'%', color:'#0d9488', sub:'sobre todos los indicadores'},
-    {label:'Docentes observados', value:Object.keys(byTeacher).length, color:'#7c3aed'},
-    {label:'Indicadores evaluados', value:allInds.length, color:'#d97706'},
-  ]);
-
-  // Worst indicators
-  html += cardWrap('Indicadores con más áreas de mejora (más No)', 
-    worst.map(c => barHTML(c.ind, c.total>0?c.no/c.total*100:0, '#e11d48', c.no, c.total)).join(''),
-    '#e11d48');
-
-  // Best indicators
-  html += cardWrap('Fortalezas del equipo (más Sí)',
-    best.map(c => barHTML(c.ind, c.total>0?c.si/c.total*100:0, '#0d9488', c.si, c.total)).join(''),
-    '#0d9488');
-
-  // By section
-  const secData = Object.entries(LW_SECCIONES).map(([sec, inds]) => {
-    const secCounts = counts.filter(c=>c.sec===sec);
-    const si = secCounts.reduce((a,c)=>a+c.si,0);
-    const total = secCounts.reduce((a,c)=>a+c.total,0);
-    return {sec, si, total, pct: total>0?si/total*100:0};
-  });
-  html += cardWrap('Resultado por sección',
-    secData.map(s => barHTML(s.sec, s.pct, '#0d9488', s.si, s.total)).join(''),
-    '#0d9488');
-
-  // By teacher
-  const teacherEntries = Object.entries(byTeacher).sort((a,b)=>(b[1].si/b[1].total)-(a[1].si/a[1].total));
-  if(teacherEntries.length > 1) {
-    html += cardWrap('Comparativa entre docentes (% de Sí)',
-      teacherEntries.map(([name,v]) => barHTML(shortName(name), v.total>0?v.si/v.total*100:0, '#7c3aed', v.si, v.total)).join(''),
-      '#7c3aed');
-  }
-
-  // Trend by month
-  const monthEntries = MONTHS.filter(m=>byMonth[m]).map(m=>({m, ...byMonth[m]}));
-  if(monthEntries.length > 1) {
-    html += cardWrap('Tendencia mensual (% de Sí)',
-      monthEntries.map(e => barHTML(cap(e.m), e.total>0?e.si/e.total*100:0, '#d97706', e.si, e.total)).join(''),
-      '#d97706');
-  }
-
-  panel.innerHTML = html;
-}
 
 // ---- FO REPORT ----
 const FO_DOMINIOS = ['D1','D2','D3','D4','D5'];
@@ -3384,7 +3318,7 @@ function renderFOStep(a) {
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div><label style="font-size:12px;font-weight:500;color:var(--ink3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Materia *</label>
-          <select class="fc" id="fo-materia"><option>Primero elige nivel</option></select></div>
+          <div id="fo-materia-wrap"><select class="fc" id="fo-materia"><option>Primero elige nivel</option></select></div></div>
         <div><label style="font-size:12px;font-weight:500;color:var(--ink3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Fecha</label>
           <input type="date" class="fc" id="fo-fecha" value="${a.date||new Date().toISOString().split('T')[0]}"></div>
       </div>
@@ -3510,12 +3444,16 @@ function renderFOStep(a) {
 function foUpdateGrupos() {
   const nivel = document.getElementById('fo-nivel')?.value;
   const gSel = document.getElementById('fo-grupo');
-  const mSel = document.getElementById('fo-materia');
-  if (!gSel || !mSel) return;
+  const mWrap = document.getElementById('fo-materia-wrap');
+  if (!gSel || !mWrap) return;
   const grupos = GRUPOS_MAP[nivel] || [];
-  const materias = MATERIAS_MAP[nivel] || [];
   gSel.innerHTML = `<option value="">Selecciona grupo</option>${grupos.map(g=>`<option>${g}</option>`).join('')}`;
-  mSel.innerHTML = `<option value="">Selecciona materia</option>${materias.map(m=>`<option>${m}</option>`).join('')}`;
+  if (nivel === 'Preparatoria') {
+    mWrap.innerHTML = `<input class="fc" id="fo-materia" placeholder="Escribe la materia">`;
+  } else {
+    const materias = MATERIAS_MAP[nivel] || [];
+    mWrap.innerHTML = `<select class="fc" id="fo-materia"><option value="">Selecciona materia</option>${materias.map(m=>`<option>${m}</option>`).join('')}</select>`;
+  }
 }
 
 function foSelectDomain(key) {
@@ -3808,12 +3746,15 @@ async function submitMC(markDone = false) {
     if(markDone) {
       await sb(`activities?id=eq.${currentFormActivity.id}`,{method:'PATCH',body:JSON.stringify({status:'done'})});
       await loadActivities();
+      const teacherName = currentFormActivity.teacher_name, leaderName = currentProfile?.leader_name;
       closeModal('modal-form');
       notify('Modelaje completado ✓');
+      renderCurrentPage();
+      if(payload.fecha_seguimiento) openFollowUpModal(teacherName, leaderName, payload.fecha_seguimiento);
     } else {
       notify('Borrador guardado — puedes seguir llenando más tarde ✓');
+      renderCurrentPage();
     }
-    renderCurrentPage();
   } catch(e){notify('Error al guardar.');}
   btn.textContent='Guardar borrador'; btn.disabled=false;
 }
@@ -3914,9 +3855,11 @@ async function submitFB() {
     })});
     await sb(`activities?id=eq.${currentFormActivity.id}`,{method:'PATCH',body:JSON.stringify({status:'done'})});
     await loadActivities();
+    const teacherName = currentFormActivity.teacher_name, leaderName = currentProfile?.leader_name;
     closeModal('modal-form');
     notify('Feedback guardado y sesión completada ✓');
     renderCurrentPage();
+    openFollowUpModal(teacherName, leaderName, fechaSeg);
   } catch(e){notify('Error al guardar.');}
   btn.textContent='Guardar feedback ✓'; btn.disabled=false;
 }
