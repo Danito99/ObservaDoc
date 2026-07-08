@@ -3290,6 +3290,7 @@ function getScaleValues(prefix, count) {
 // ---- FO FORM ----
 let foStep = 1, foSelectedDomain = null, foSelectedAspecto = null, foIndicators = [], foPrefix = 'fo';
 let foRespuestas = {}, foNotas = {};
+let foDatosGenerales = {};
 
 // Batería extra de Innovación y Tecnología: visible en todos los dominios, solo para este perfil
 const FO_TECH_EMAIL = 'despinosa@mx.christelhouse.org';
@@ -3325,7 +3326,7 @@ function getFOAspectos(dom) {
 }
 
 function buildFormFO(a) {
-  foStep = 1; foSelectedDomain = null; foSelectedAspecto = null; foRespuestas = {}; foNotas = {};
+  foStep = 1; foSelectedDomain = null; foSelectedAspecto = null; foRespuestas = {}; foNotas = {}; foDatosGenerales = {};
   renderFOStep(a);
 }
 
@@ -3510,6 +3511,15 @@ function foNext() {
     const nivel = document.getElementById('fo-nivel')?.value;
     const objetivo = document.getElementById('fo-objetivo')?.value.trim();
     if (!nivel || !objetivo) { notify('Completa los campos requeridos'); return; }
+    // Capturar datos generales ANTES de que el paso 2 reemplace este HTML
+    foDatosGenerales = {
+      nivel,
+      grupo: document.getElementById('fo-grupo')?.value,
+      materia: document.getElementById('fo-materia')?.value,
+      objetivo,
+      parte_clase: document.getElementById('fo-parte')?.value,
+      fecha: document.getElementById('fo-fecha')?.value
+    };
     foStep = 2;
   } else if (foStep===2) {
     if (!foSelectedDomain) { notify('Elige un dominio para continuar'); return; }
@@ -3540,12 +3550,12 @@ async function submitFO() {
       activity_id: currentFormActivity.id,
       leader_name: currentProfile?.leader_name,
       teacher_name: currentFormActivity.teacher_name,
-      nivel: document.getElementById('fo-nivel')?.value,
-      grupo: document.getElementById('fo-grupo')?.value,
-      materia: document.getElementById('fo-materia')?.value,
-      objetivo: document.getElementById('fo-objetivo')?.value,
-      parte_clase: document.getElementById('fo-parte')?.value,
-      fecha: document.getElementById('fo-fecha')?.value,
+      nivel: foDatosGenerales.nivel,
+      grupo: foDatosGenerales.grupo,
+      materia: foDatosGenerales.materia,
+      objetivo: foDatosGenerales.objetivo,
+      parte_clase: foDatosGenerales.parte_clase,
+      fecha: foDatosGenerales.fecha,
       dominio: foSelectedDomain,
       aspecto: getFOAspectos(FORM_DATA.fo.dominios[foSelectedDomain]).map(([k])=>k).join(', '),
       respuestas, notas,
