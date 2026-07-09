@@ -2,7 +2,7 @@
 // Estrategia network-first: siempre intenta traer la versión más reciente
 // (para que un push a main llegue de inmediato) y usa la copia en caché
 // solo cuando no hay conexión.
-const CACHE = 'observadoc-v1';
+const CACHE = 'observadoc-v2';
 const APP_SHELL = [
   './',
   './index.html',
