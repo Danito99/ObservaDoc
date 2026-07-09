@@ -538,12 +538,12 @@ textarea.fc{resize:vertical;min-height:70px}
       <div class="ph"><div class="ph-left"><h2>Mi calendario</h2><p>Sincroniza tus actividades con Outlook</p></div></div>
       <div class="cal-panel">
         <h3>📅 Agregar a Outlook</h3>
-        <p>Copia tu link personal y agrégalo a Outlook una sola vez. Tus actividades se sincronizarán automáticamente cada vez que se registren nuevas.</p>
+        <p>Copia tu link personal y agrégalo a Outlook una sola vez. Todas tus actividades —nuevas, editadas o eliminadas— se reflejarán automáticamente. Outlook actualiza los calendarios suscritos cada pocas horas.</p>
         <div class="cal-steps">
           <div class="cal-step"><div class="cal-step-num">1</div><span>Copia tu link personal de abajo</span></div>
           <div class="cal-step"><div class="cal-step-num">2</div><span>En Outlook ve a <strong>Calendario → Agregar calendario → Desde internet</strong></span></div>
           <div class="cal-step"><div class="cal-step-num">3</div><span>Pega el link y haz clic en <strong>Aceptar</strong></span></div>
-          <div class="cal-step"><div class="cal-step-num">4</div><span>¡Listo! Outlook se actualiza automáticamente</span></div>
+          <div class="cal-step"><div class="cal-step-num">4</div><span>¡Listo! Outlook se actualiza solo (cada pocas horas)</span></div>
         </div>
         <div style="font-size:12px;opacity:.8;margin-bottom:6px">Tu link personal (haz clic para copiar):</div>
         <div class="cal-url-box" id="ical-url" onclick="copyCalUrl()">Cargando...</div>
@@ -994,9 +994,8 @@ async function startApp() {
   document.getElementById('user-name').textContent = currentProfile.name || currentUser.email;
   document.getElementById('user-avatar').textContent = initials(currentProfile.name || currentUser.email);
   document.getElementById('hoy').textContent = new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  // Set iCal URL
-  const icalUrl = `${SUPABASE_URL}/rest/v1/activities?leader_name=eq.${encodeURIComponent(currentProfile.leader_name)}&status=eq.pending&select=*&apikey=${SUPABASE_KEY}`;
-  document.getElementById('ical-url').textContent = `${window.location.origin}/ical?user=${encodeURIComponent(currentUser.email)}`;
+  // Set iCal URL (feed en vivo servido por la edge function "ical")
+  loadIcalUrl();
   await Promise.all([loadTeachers(), loadLeaders()]);
   await loadActivities();
   populateSelects();
@@ -1648,8 +1647,20 @@ function renderMyCalendar() {
   </table>`:'<div class="empty"><div class="empty-icon">✓</div><p>No tienes actividades pendientes próximas</p></div>';
 }
 
+async function loadIcalUrl(){
+  const box=document.getElementById('ical-url');
+  try{
+    const res=await fetch(SUPABASE_URL+'/functions/v1/ical',{headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+accessToken}});
+    const j=await res.json();
+    if(res.ok&&j.url){box.textContent=j.url;box.dataset.ready='1';}
+    else{box.textContent=j.error||'No se pudo generar tu link — contacta al administrador';delete box.dataset.ready;}
+  }catch(e){box.textContent='No se pudo generar tu link — revisa tu conexión';delete box.dataset.ready;}
+}
+
 function copyCalUrl(){
-  const url=document.getElementById('ical-url').textContent;
+  const box=document.getElementById('ical-url');
+  if(!box.dataset.ready){notify('El link aún no está listo');return;}
+  const url=box.textContent;
   navigator.clipboard.writeText(url).then(()=>notify('Link copiado ✓')).catch(()=>{
     const el=document.getElementById('ical-url');
     const range=document.createRange();range.selectNode(el);

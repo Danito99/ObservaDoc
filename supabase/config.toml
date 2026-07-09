@@ -1,0 +1,6 @@
+project_id = "ObservaDoc"
+
+[functions.ical]
+# Outlook consulta el feed sin headers de autenticación; la seguridad la da
+# el token HMAC dentro de la URL.
+verify_jwt = false
