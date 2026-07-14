@@ -46,7 +46,7 @@ body{font-family:'Outfit',sans-serif;background:var(--paper);color:var(--ink);mi
 .mb-row{display:flex;gap:4px;flex-wrap:wrap}
 .mb-dot{width:15px;height:15px;border-radius:50%;background:var(--paper2);flex-shrink:0}
 .mb-dot.on-a{background:var(--ch-orange)}
-.mb-dot.on-g{background:var(--violet)}.mb-dot.on-l{background:var(--lab-green)}
+.mb-dot.on-l{background:var(--lab-green)}
 .section-title{font-family:'Playfair Display',serif;font-size:16px;margin-bottom:12px}
 .challenge-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
 .challenge-title{font-size:13.5px;font-weight:600;color:var(--ink);margin-bottom:3px}
@@ -78,9 +78,9 @@ const SUPABASE_URL = 'https://sjbzlwytzqhkxfxbgpqt.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNqYnpsd3l0enFoa3hmeGJncHF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NTM3NzQsImV4cCI6MjA4OTQyOTc3NH0.GGwL1ZngD97LLPivM-QCT5yRcFBu2vGEvB_msqgFADk';
 
 const HITOS_APRENDIZAJE = ['Lanzamiento','Aumento de Ratio','The Hook','The Joy Factor','ABP — Lanzamiento','ABP — Planificación','ABP — Investigación','ABP — Presentación','ABP — Reflexión','Cierre integral'];
-const HITOS_GAMIFICACION = ['Retroalimentación viva','Metas y progreso visible','Reto graduado','Puntos con propósito','Aula social','Arquitectura del sistema','Narrativa y mundo','Economía y progresión','Misiones y boss final','Sistema completo'];
-const HITOS_LAB = ['Cortadora láser','Diseño digital','Construcción','Robótica','Crafting','Clase en el Lab'];
-const TOTAL_HITOS_POR_DOCENTE = 26;
+const TALLERES_LAB = ['Cortadora láser','Diseño digital','Construcción','Robótica','Crafting'];
+// Cada taller del Lab tiene 3 sesiones: s1 = hito_n del taller (1–5), s2 = +10 (11–15), s3 = +20 (21–25)
+const TOTAL_HITOS_POR_DOCENTE = 19; // 10 aprendizaje + 9 lab (meta: 3 talleres × 3 sesiones)
 
 async function rpc(name) {
   try {
@@ -109,10 +109,9 @@ function getTeamRank(pct) {
 
 function miniBadges(achieved) {
   const rowA = HITOS_APRENDIZAJE.map((n,i)=>`<span class="mb-dot ${achieved.has('aprendizaje-'+(i+1))?'on-a':''}" title="${n}"></span>`).join('');
-  const rowG = HITOS_GAMIFICACION.map((n,i)=>`<span class="mb-dot ${achieved.has('gamificacion-'+(i+1))?'on-g':''}" title="${n}"></span>`).join('');
-  const rowL = HITOS_LAB.map((n,i)=>`<span class="mb-dot ${achieved.has('lab-'+(i+1))?'on-l':''}" title="${n}"></span>`).join('');
+  const rowL = TALLERES_LAB.map((n,i)=>
+    [0,10,20].map((off,s)=>`<span class="mb-dot ${achieved.has('lab-'+(i+1+off))?'on-l':''}" title="${n} · Sesión ${s+1}"></span>`).join('')).join('');
   return `<div class="mb-label">Aprendizaje Activo</div><div class="mb-row">${rowA}</div>
-          <div class="mb-label">Gamificación</div><div class="mb-row">${rowG}</div>
           <div class="mb-label">Innovation Lab</div><div class="mb-row">${rowL}</div>`;
 }
 
@@ -126,7 +125,7 @@ async function load() {
   const grid = document.getElementById('grid');
   grid.innerHTML = progress.length ? progress.map(p => {
     const posible = p.miembros * TOTAL_HITOS_POR_DOCENTE;
-    const pct = posible ? Math.round(p.validadas/posible*100) : 0;
+    const pct = posible ? Math.min(100, Math.round(p.validadas/posible*100)) : 0;
     const r = getTeamRank(pct);
     const achieved = new Set(hitos.filter(h=>h.colegiado===p.colegiado).map(h=>`${h.programa_id}-${h.hito_n}`));
     return `<div class="team-card">
