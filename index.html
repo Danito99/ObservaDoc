@@ -317,7 +317,7 @@ textarea.fc{resize:vertical;min-height:70px}
 .mb-row{display:flex;gap:4px;flex-wrap:wrap}
 .mb-dot{width:15px;height:15px;border-radius:50%;background:var(--paper2);flex-shrink:0}
 .mb-dot.on-a{background:var(--ch-orange)}
-.mb-dot.on-l{background:var(--lab-green)}
+.mb-dot.on-l{background:var(--lab-green)}.mb-dot.on-c{background:var(--violet)}
 @media(max-width:860px){.prog-grid{grid-template-columns:1fr}.hitos-grid{grid-template-columns:repeat(2,1fr)}#equipos-grid{grid-template-columns:1fr!important}}
 
 /* MOBILE NAV */
@@ -1105,6 +1105,9 @@ function closeMobileNav() {
 // ===== PROGRAMAS DE FORMACIÓN =====
 let selectedPrograma = null, currentProgTeacher = null, currentProgValidations = [], currentHitoContext = null;
 
+// Estrategias de aula: se marcan al final de LW/FO y son las clínicas de capacitación
+const ESTRATEGIAS_AULA = ['Gestión de aula','Planeaciones efectivas','Objetivos claros','Tickets de salida','Yo hago','Monitoreo estratégico','Corroborar el aprendizaje','Transiciones claras','Evitar preguntas retóricas','Chequeo afirmativo','Observación directa','Mostrar a todos','Cultura del error','Muéstrenme / Revisión entre pares','Gira y discute','TPS'];
+
 const PROGRAMAS = {
   aprendizaje: {
     label: 'Programa de formación · 2026–27',
@@ -1135,22 +1138,50 @@ const PROGRAMAS = {
       {n:4,nombre:'Robótica',desc:'Programación y ensamblaje de robots'},
       {n:5,nombre:'Crafting',desc:'Materiales y técnicas de crafting'},
     ],
+  },
+  clinicas: {
+    label: 'Clínicas de estrategias · 2026–27',
+    title: 'Clínicas de Estrategias de Aula',
+    desc: '16 clínicas · capacitación + observación en clase',
+    barColor: 'var(--violet)',
+    hitos: ESTRATEGIAS_AULA.map((e,i)=>({n:i+1,nombre:e,desc:''})),
   }
 };
 
-// Innovation Lab: cada taller tiene 3 sesiones guardadas en badge_validations.
-// Sesión 1 (práctica) = hito_n del taller (1–5); Sesión 2 (proyecto) = hito_n + 10 (11–15);
-// Sesión 3 (implementación en el aula) = hito_n + 20 (21–25).
-// La inscripción al taller es la existencia del registro de la sesión 1 (aunque no esté validado).
-const LAB_S2_OFFSET = 10, LAB_S3_OFFSET = 20;
-const LAB_META_TALLERES = 3;
-const LAB_SESIONES_POR_TALLER = 3;
-const LAB_META_SESIONES = LAB_META_TALLERES * LAB_SESIONES_POR_TALLER;
-const LAB_SESIONES = {1:'Práctica en la estación', 2:'Proyecto e implementación', 3:'Implementación en el aula'};
-function labSesionDe(hitoN){ return hitoN > LAB_S3_OFFSET ? 3 : hitoN > LAB_S2_OFFSET ? 2 : 1; }
-function labHitoDe(tallerN, sesion){ return tallerN + (sesion-1)*10; }
-function labTallerDe(hitoN){ return PROGRAMAS.lab.hitos.find(h=>h.n === ((hitoN-1) % 10) + 1); }
-function labTalleresCompletos(completados){ return PROGRAMAS.lab.hitos.filter(h=>completados.includes(h.n) && completados.includes(h.n+LAB_S2_OFFSET) && completados.includes(h.n+LAB_S3_OFFSET)).length; }
+// Programas tipo "taller" (Innovation Lab y Clínicas): cada unidad (taller/clínica) tiene
+// varias sesiones guardadas en badge_validations con hito_n = unidad + (sesión−1)×offset.
+//   lab:      s1 práctica = 1–5 · s2 proyecto = 11–15 · s3 implementación = 21–25
+//   clinicas: s1 capacitación = 1–16 · s2 observación en aula = 21–36
+// La inscripción a la unidad es la existencia del registro de la sesión 1 (aunque no esté validado).
+// En la sesión con fechas: implementation_dates = fecha(s); project_plan = propuesta (lab);
+// observacion_tipo = tipo de observación agendada (clínicas: LW / formal / modelaje).
+const TALLER_CFG = {
+  lab: {
+    offset:10, meta:3, unidad:'taller', unidadPlural:'talleres',
+    sesiones:{1:'Práctica en la estación',2:'Proyecto e implementación',3:'Implementación en el aula'},
+    planSesion:2, fechasSesion:2, fechasLabel:'Fecha(s) de implementación',
+    planLabel:'Propuesta de implementación',
+    planPlaceholder:'¿Qué hará el docente con su grupo? ¿Cómo vincula lo aprendido en el taller con su materia o proyecto?',
+    rango:[1,2,3],
+  },
+  clinicas: {
+    offset:20, meta:3, unidad:'clínica', unidadPlural:'clínicas',
+    sesiones:{1:'Clínica de capacitación',2:'Observación en el aula'},
+    tipoSesion:2, fechasSesion:2, fechasLabel:'Fecha(s) de observación',
+    rango:[1,2,3],
+  }
+};
+const OBSERVACION_TIPOS = ['Learning walk','Observación formal','Modelaje'];
+function tallerCfg(progId){ return TALLER_CFG[progId]; }
+function tallerNumSesiones(progId){ return Object.keys(TALLER_CFG[progId].sesiones).length; }
+function tallerMetaSesiones(progId){ const c=TALLER_CFG[progId]; return c.meta * tallerNumSesiones(progId); }
+function tallerSesionDe(progId, hitoN){ return Math.floor((hitoN-1)/TALLER_CFG[progId].offset)+1; }
+function tallerHitoDe(progId, tallerN, sesion){ return tallerN + (sesion-1)*TALLER_CFG[progId].offset; }
+function tallerDe(progId, hitoN){ return PROGRAMAS[progId].hitos.find(h=>h.n === ((hitoN-1) % TALLER_CFG[progId].offset) + 1); }
+function talleresCompletos(progId, completados){
+  const ses = Object.keys(TALLER_CFG[progId].sesiones).map(Number);
+  return PROGRAMAS[progId].hitos.filter(h=>ses.every(s=>completados.includes(tallerHitoDe(progId,h.n,s)))).length;
+}
 
 const LAB_S2_CRITERIA = ['El docente propone un proyecto o actividad que vincula el taller con su materia','La propuesta describe qué hará el docente y qué producirán los alumnos','La propuesta es viable con lo aprendido y los recursos de la estación','Definió fecha(s) de implementación con su grupo'];
 const LAB_S3_CRITERIA = ['El docente implementó la sesión (o sesiones) de su proyecto en la fecha planeada','Los alumnos utilizaron la estación bajo la supervisión y guía del docente','Existe evidencia de la actividad (fotografía, video o producto del alumno)','El docente puede describir el aprendizaje generado y cómo se vincula con su materia'];
@@ -1178,15 +1209,25 @@ const HITO_CRITERIA = {
     11: LAB_S2_CRITERIA, 12: LAB_S2_CRITERIA, 13: LAB_S2_CRITERIA, 14: LAB_S2_CRITERIA, 15: LAB_S2_CRITERIA,
     // Sesión 3 (hito_n = taller + 20): implementación en el aula
     21: LAB_S3_CRITERIA, 22: LAB_S3_CRITERIA, 23: LAB_S3_CRITERIA, 24: LAB_S3_CRITERIA, 25: LAB_S3_CRITERIA,
-  }
+  },
+  clinicas: {},
 };
 
+const CLINICA_S1_CRITERIA = ['Asistió a la clínica de capacitación de la estrategia','Comprende la estrategia y en qué momentos aplicarla','Identifica cómo usarla con su materia y su grupo','Sabe qué evidencia mostraría que la estrategia funciona'];
+const CLINICA_S2_CRITERIA = ['Se agendó la observación en clase (learning walk, formal o modelaje)','Durante la observación se evidenció el uso de la estrategia','La aplicación fue adecuada al propósito de la estrategia','Se dio retroalimentación al docente sobre la aplicación'];
+PROGRAMAS.clinicas.hitos.forEach(h => {
+  HITO_CRITERIA.clinicas[h.n] = CLINICA_S1_CRITERIA;
+  HITO_CRITERIA.clinicas[tallerHitoDe('clinicas', h.n, 2)] = CLINICA_S2_CRITERIA;
+});
+
 function getRangoProg(completados, progId, hitos) {
-  if (progId==='lab') {
-    const completos = labTalleresCompletos(completados);
-    if (completos>=3) return {label:'Referente',cls:'rango-referente',icon:'◈'};
-    if (completos>=2) return {label:'Maestro',cls:'rango-maestro',icon:'◉'};
-    if (completos>=1) return {label:'Practicante',cls:'rango-practicante',icon:'◎'};
+  const cfg = TALLER_CFG[progId];
+  if (cfg) {
+    const completos = talleresCompletos(progId, completados);
+    const [pra, mae, ref] = cfg.rango;
+    if (completos>=ref) return {label:'Referente',cls:'rango-referente',icon:'◈'};
+    if (completos>=mae) return {label:'Maestro',cls:'rango-maestro',icon:'◉'};
+    if (completos>=pra) return {label:'Practicante',cls:'rango-practicante',icon:'◎'};
     return {label:'Aprendiz',cls:'rango-aprendiz',icon:'○'};
   }
   const n = completados.length;
@@ -1225,6 +1266,7 @@ async function renderProgramas() {
     const tv = allVals.filter(v=>v.teacher_name===t.name);
     const cA = tv.filter(v=>v.programa_id==='aprendizaje').length;
     const cL = tv.filter(v=>v.programa_id==='lab').length;
+    const cC = tv.filter(v=>v.programa_id==='clinicas').length;
     return `<div class="teacher-card" onclick="openTeacherProgramas('${t.name.replace(/'/g,"\\'")}')">
       <div class="tc-header">
         <div class="tc-avatar">${initials(t.name)}</div>
@@ -1235,8 +1277,11 @@ async function renderProgramas() {
           <div class="tc-bar-track"><div class="tc-bar-fill" style="width:${Math.round(cA/10*100)}%;background:var(--ch-orange)"></div></div>
           <span class="tc-bar-val">${cA}/10</span></div>
         <div class="tc-bar-row"><span class="tc-bar-lbl">Lab.</span>
-          <div class="tc-bar-track"><div class="tc-bar-fill" style="width:${Math.min(100,Math.round(cL/LAB_META_SESIONES*100))}%;background:var(--lab-green)"></div></div>
-          <span class="tc-bar-val">${cL}/${LAB_META_SESIONES}</span></div>
+          <div class="tc-bar-track"><div class="tc-bar-fill" style="width:${Math.min(100,Math.round(cL/tallerMetaSesiones('lab')*100))}%;background:var(--lab-green)"></div></div>
+          <span class="tc-bar-val">${cL}/${tallerMetaSesiones('lab')}</span></div>
+        <div class="tc-bar-row"><span class="tc-bar-lbl">Clín.</span>
+          <div class="tc-bar-track"><div class="tc-bar-fill" style="width:${Math.min(100,Math.round(cC/tallerMetaSesiones('clinicas')*100))}%;background:var(--violet)"></div></div>
+          <span class="tc-bar-val">${cC}/${tallerMetaSesiones('clinicas')}</span></div>
       </div>
     </div>`;
   }).join('');
@@ -1275,11 +1320,11 @@ function renderProgCards() {
   cards.innerHTML = Object.entries(PROGRAMAS).map(([id,p]) => {
     const completados = currentProgValidations.filter(v=>v.programa_id===id && v.validated).map(v=>v.hito_n);
     const r = getRangoProg(completados, id, p.hitos);
-    const esLab = id==='lab';
-    const pct = esLab ? Math.min(100, Math.round(completados.length/LAB_META_SESIONES*100))
+    const cfg = TALLER_CFG[id];
+    const pct = cfg ? Math.min(100, Math.round(completados.length/tallerMetaSesiones(id)*100))
       : Math.round(completados.length/p.hitos.length*100);
-    const stats = esLab
-      ? `<div class="prog-stat"><b>${labTalleresCompletos(completados)}/${LAB_META_TALLERES}</b><span>talleres (meta)</span></div>
+    const stats = cfg
+      ? `<div class="prog-stat"><b>${talleresCompletos(id, completados)}/${cfg.meta}</b><span>${cfg.unidadPlural} (meta)</span></div>
          <div class="prog-stat"><b>${completados.length}</b><span>sesiones validadas</span></div>`
       : `<div class="prog-stat"><b>${completados.length}/${p.hitos.length}</b><span>competencias</span></div>
          <div class="prog-stat"><b>${pct}%</b><span>avance</span></div>`;
@@ -1291,7 +1336,7 @@ function renderProgCards() {
       <div class="prog-bar-wrap"><div class="prog-bar" style="width:${pct}%;${p.barColor?'background:'+p.barColor:''}"></div></div>
       <div class="prog-stats">${stats}</div>
       <span class="rango-pill ${r.cls}">${r.icon} ${r.label}</span>
-      <div style="font-size:11px;color:var(--ink3);margin-top:10px">${sel?'▲ Cerrar detalle':(esLab?'▼ Ver talleres':'▼ Ver competencias')}</div>
+      <div style="font-size:11px;color:var(--ink3);margin-top:10px">${sel?'▲ Cerrar detalle':'▼ Ver '+(cfg?cfg.unidadPlural:'competencias')}</div>
     </div>`;
   }).join('');
   if (selectedPrograma) renderProgHitos(selectedPrograma);
@@ -1307,62 +1352,66 @@ function renderProgHitos(progId) {
   rangoEl.className = 'rango-pill '+r.cls;
   rangoEl.textContent = r.icon+' '+r.label;
   const grid = document.getElementById('prog-hitos-grid');
-  if (progId==='lab') { grid.className = 'talleres-grid'; grid.innerHTML = labTalleresHTML(); return; }
+  if (TALLER_CFG[progId]) { grid.className = 'talleres-grid'; grid.innerHTML = talleresHTML(progId); return; }
   grid.className = 'hitos-grid';
   let html = '';
   p.hitos.forEach(h => { html += hitoCardHTML(h, completados, currentProgTeacher, progId); });
   grid.innerHTML = html;
 }
 
-function labTalleresHTML() {
-  const vals = currentProgValidations.filter(v=>v.programa_id==='lab');
-  const inscritos = PROGRAMAS.lab.hitos.filter(h => vals.some(v=>labTallerDe(v.hito_n)?.n===h.n)).length;
-  const resumen = `<div class="lab-resumen">Inscrito a <b>${inscritos}</b> de 5 talleres · meta: al menos ${LAB_META_TALLERES}</div>`;
-  return resumen + PROGRAMAS.lab.hitos.map(h => {
-    const ses = [1,2,3].map(num => vals.find(v=>v.hito_n===labHitoDe(h.n,num)));
+function talleresHTML(progId) {
+  const cfg = TALLER_CFG[progId];
+  const sesNums = Object.keys(cfg.sesiones).map(Number);
+  const vals = currentProgValidations.filter(v=>v.programa_id===progId);
+  const inscritos = PROGRAMAS[progId].hitos.filter(h => vals.some(v=>tallerDe(progId, v.hito_n)?.n===h.n)).length;
+  const resumen = `<div class="lab-resumen">Inscrito a <b>${inscritos}</b> de ${PROGRAMAS[progId].hitos.length} ${cfg.unidadPlural} · meta: al menos ${cfg.meta}</div>`;
+  return resumen + PROGRAMAS[progId].hitos.map(h => {
+    const ses = sesNums.map(num => vals.find(v=>v.hito_n===tallerHitoDe(progId,h.n,num)));
     const inscrito = ses.some(Boolean);
     const completo = ses.every(v=>v?.validated);
-    const fechas = (ses[1]?.implementation_dates || []).map(d =>
+    const sesFechas = cfg.fechasSesion ? ses[cfg.fechasSesion-1] : null;
+    const fechas = (sesFechas?.implementation_dates || []).map(d =>
       new Date(d+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'short'})).join(', ');
+    const tipoObs = sesFechas?.observacion_tipo || '';
     const sinAvance = ses.every(v => !v?.validated && !v?.project_plan && !(v?.criteria_checked||[]).some(Boolean));
     const sesionBtn = num => {
       const val = ses[num-1];
       const done = !!val?.validated;
       const enProgreso = !done && !!val && ((val.criteria_checked||[]).some(Boolean) || val.project_plan || val.notes);
-      return `<button class="taller-sesion ${done?'ts-done':enProgreso?'ts-progreso':''}" onclick="event.stopPropagation();openHitoModal('lab',${labHitoDe(h.n,num)},'${(currentProgTeacher||'').replace(/'/g,"\\'")}')">
+      return `<button class="taller-sesion ${done?'ts-done':enProgreso?'ts-progreso':''}" onclick="event.stopPropagation();openHitoModal('${progId}',${tallerHitoDe(progId,h.n,num)},'${(currentProgTeacher||'').replace(/'/g,"\\'")}')">
         <span class="ts-num">${done?'✓':num}</span>
-        <span class="ts-txt">Sesión ${num} · ${LAB_SESIONES[num]}</span>
+        <span class="ts-txt">Sesión ${num} · ${cfg.sesiones[num]}</span>
         <span class="ts-status">${done?'Validada':enProgreso?'En progreso':'Pendiente'}</span>
       </button>`;
     };
     return `<div class="taller ${completo?'completo':''} ${inscrito?'':'no-inscrito'}">
       <div class="taller-head">
-        <div><div class="taller-nombre">${h.nombre}</div><div class="taller-desc">${h.desc}</div></div>
+        <div><div class="taller-nombre">${h.nombre}</div>${h.desc?`<div class="taller-desc">${h.desc}</div>`:''}</div>
         ${inscrito
           ? `<span class="taller-pill">✓ Inscrito</span>`
-          : `<button class="btn btn-outline btn-sm" onclick="inscribirTaller(${h.n})">Inscribir</button>`}
+          : `<button class="btn btn-outline btn-sm" onclick="inscribirTaller('${progId}',${h.n})">Inscribir</button>`}
       </div>
-      ${inscrito ? `<div class="taller-sesiones">${sesionBtn(1)}${sesionBtn(2)}${sesionBtn(3)}</div>
-        ${fechas?`<div class="taller-fechas">📅 Implementación: ${fechas}</div>`:''}
-        ${sinAvance ? `<div class="taller-quitar"><a href="#" onclick="event.preventDefault();quitarInscripcionTaller(${h.n})">Quitar inscripción</a></div>` : ''}`
-        : `<div class="taller-desc" style="margin-top:8px">Inscríbase para habilitar las tres sesiones del taller</div>`}
+      ${inscrito ? `<div class="taller-sesiones">${sesNums.map(sesionBtn).join('')}</div>
+        ${fechas?`<div class="taller-fechas">📅 ${tipoObs?tipoObs+': ':'Implementación: '}${fechas}</div>`:''}
+        ${sinAvance ? `<div class="taller-quitar"><a href="#" onclick="event.preventDefault();quitarInscripcionTaller('${progId}',${h.n})">Quitar inscripción</a></div>` : ''}`
+        : `<div class="taller-desc" style="margin-top:8px">Inscríbase para habilitar las sesiones de la ${cfg.unidad}</div>`}
     </div>`;
   }).join('');
 }
 
-async function inscribirTaller(tallerN) {
-  const payload = {teacher_name:currentProgTeacher, programa_id:'lab', hito_n:tallerN, criteria_checked:[],
+async function inscribirTaller(progId, tallerN) {
+  const payload = {teacher_name:currentProgTeacher, programa_id:progId, hito_n:tallerN, criteria_checked:[],
     validated:false, validated_by:'', validated_at:null, notes:'', ciclo_escolar:'2026-2027', updated_at:new Date().toISOString()};
   try {
     const created = await sb('badge_validations', {method:'POST', body:JSON.stringify(payload)});
     if (created?.[0]) currentProgValidations.push(created[0]);
-    notify(`✓ Inscrito al taller: ${PROGRAMAS.lab.hitos.find(h=>h.n===tallerN).nombre}`);
+    notify(`✓ Inscrito a: ${PROGRAMAS[progId].hitos.find(h=>h.n===tallerN).nombre}`);
     renderProgCards();
   } catch(e) { notify('Error al inscribir. Verifica tu conexión.'); }
 }
 
-async function quitarInscripcionTaller(tallerN) {
-  const ids = currentProgValidations.filter(v=>v.programa_id==='lab' && labTallerDe(v.hito_n)?.n===tallerN).map(v=>v.id);
+async function quitarInscripcionTaller(progId, tallerN) {
+  const ids = currentProgValidations.filter(v=>v.programa_id===progId && tallerDe(progId, v.hito_n)?.n===tallerN).map(v=>v.id);
   if (!ids.length) return;
   try {
     await sb(`badge_validations?id=in.(${ids.join(',')})`, {method:'DELETE'});
@@ -1374,34 +1423,45 @@ async function quitarInscripcionTaller(tallerN) {
 
 function openHitoModal(progId, hitoN, teacherName) {
   currentHitoContext = {progId, hitoN, teacherName};
-  const esLab = progId==='lab';
-  const hito = esLab ? labTallerDe(hitoN) : PROGRAMAS[progId].hitos.find(h=>h.n===hitoN);
-  const sesion = esLab ? labSesionDe(hitoN) : null;
-  const esLabS2 = sesion===2;
+  const cfg = TALLER_CFG[progId];
+  const hito = cfg ? tallerDe(progId, hitoN) : PROGRAMAS[progId].hitos.find(h=>h.n===hitoN);
+  const sesion = cfg ? tallerSesionDe(progId, hitoN) : null;
   const existing = currentProgValidations.find(v=>v.programa_id===progId && v.hito_n===hitoN);
   const criteria = HITO_CRITERIA[progId][hitoN] || [];
   const checked = existing?.criteria_checked || [];
-  document.getElementById('hito-modal-title').textContent = esLab
-    ? `${hito.nombre} · Sesión ${sesion}: ${LAB_SESIONES[sesion]}`
+  document.getElementById('hito-modal-title').textContent = cfg
+    ? `${hito.nombre} · Sesión ${sesion}: ${cfg.sesiones[sesion]}`
     : `Hito ${hitoN} · ${hito.nombre}`;
-  document.getElementById('hito-modal-save-btn').textContent = existing?.validated ? 'Actualizar' : (esLab ? 'Validar sesión' : 'Validar hito');
+  document.getElementById('hito-modal-save-btn').textContent = existing?.validated ? 'Actualizar' : (cfg ? 'Validar sesión' : 'Validar hito');
   const fechas = existing?.implementation_dates || [];
-  const labS2HTML = !esLabS2 ? '' : `
+  const tiposSel = (existing?.observacion_tipo||'').split(', ').filter(Boolean);
+  const lblSty = 'font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);display:block;margin-bottom:6px';
+  let extraHTML = '';
+  if (cfg?.planSesion === sesion) extraHTML += `
     <div style="margin-top:16px">
-      <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);display:block;margin-bottom:6px">Propuesta de implementación</label>
-      <textarea id="hito-plan" class="fc" style="min-height:80px" placeholder="¿Qué hará el docente con su grupo? ¿Cómo vincula lo aprendido en el taller con su materia o proyecto?">${existing?.project_plan||''}</textarea>
-    </div>
+      <label style="${lblSty}">${cfg.planLabel}</label>
+      <textarea id="hito-plan" class="fc" style="min-height:80px" placeholder="${cfg.planPlaceholder}">${existing?.project_plan||''}</textarea>
+    </div>`;
+  if (cfg?.tipoSesion === sesion) extraHTML += `
+    <div style="margin-top:16px">
+      <label style="${lblSty}">Tipo de observación</label>
+      <div style="display:flex;gap:14px;flex-wrap:wrap">
+        ${OBSERVACION_TIPOS.map(t=>`<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12.5px;color:var(--ink)">
+          <input type="checkbox" name="hito-obs-tipo" value="${t}" ${tiposSel.includes(t)?'checked':''} style="width:15px;height:15px;accent-color:var(--ch-orange)">${t}</label>`).join('')}
+      </div>
+    </div>`;
+  if (cfg?.fechasSesion === sesion) extraHTML += `
     <div style="margin-top:14px">
-      <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);display:block;margin-bottom:6px">Fecha(s) de implementación</label>
+      <label style="${lblSty}">${cfg.fechasLabel}</label>
       <div id="hito-fechas">${(fechas.length?fechas:['']).map(f=>`<input type="date" class="fc hito-fecha" style="margin-bottom:6px" value="${f}">`).join('')}</div>
       <button type="button" class="btn btn-outline btn-sm" onclick="agregarFechaImpl()">+ Agregar fecha</button>
     </div>`;
   document.getElementById('hito-modal-body').innerHTML = `
-    <div style="font-size:12px;color:var(--ink3);margin-bottom:16px">${esLab?LAB_SESIONES[sesion]+' — '+hito.nombre:hito.desc} · <b>${teacherName}</b></div>
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:16px">${cfg?cfg.sesiones[sesion]+' — '+hito.nombre:hito.desc} · <b>${teacherName}</b></div>
     <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);margin-bottom:10px">Criterios observables</div>
     ${criteria.map((c,i)=>`<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;color:var(--ink);line-height:1.4">
       <input type="checkbox" id="hc-${i}" style="margin-top:2px;width:15px;height:15px;accent-color:var(--ch-orange);flex-shrink:0" ${checked[i]?'checked':''}>${c}</label>`).join('')}
-    ${labS2HTML}
+    ${extraHTML}
     <div style="margin-top:16px">
       <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);display:block;margin-bottom:6px">Notas del observador</label>
       <textarea id="hito-notes" class="fc" style="min-height:70px" placeholder="Evidencia observada, contexto, recomendaciones...">${existing?.notes||''}</textarea>
@@ -1421,14 +1481,20 @@ async function saveHitoValidation() {
   const criteria = HITO_CRITERIA[progId][hitoN] || [];
   const criteriaChecked = criteria.map((_,i) => !!document.getElementById(`hc-${i}`)?.checked);
   const notes = document.getElementById('hito-notes')?.value || '';
-  const esLabS2 = progId==='lab' && labSesionDe(hitoN)===2;
-  const plan = esLabS2 ? (document.getElementById('hito-plan')?.value || '').trim() : null;
-  const fechasImpl = esLabS2 ? [...document.querySelectorAll('.hito-fecha')].map(i=>i.value).filter(Boolean) : null;
-  const allChecked = criteriaChecked.every(Boolean) && (!esLabS2 || (!!plan && fechasImpl.length>0));
+  const cfg = TALLER_CFG[progId];
+  const sesion = cfg ? tallerSesionDe(progId, hitoN) : null;
+  const conPlan = cfg?.planSesion === sesion, conFechas = cfg?.fechasSesion === sesion, conTipo = cfg?.tipoSesion === sesion;
+  const plan = conPlan ? (document.getElementById('hito-plan')?.value || '').trim() : null;
+  const fechasImpl = conFechas ? [...document.querySelectorAll('.hito-fecha')].map(i=>i.value).filter(Boolean) : null;
+  const tiposObs = conTipo ? [...document.querySelectorAll('input[name="hito-obs-tipo"]:checked')].map(i=>i.value) : null;
+  const allChecked = criteriaChecked.every(Boolean)
+    && (!conPlan || !!plan) && (!conFechas || fechasImpl.length>0) && (!conTipo || tiposObs.length>0);
   const payload = {teacher_name:teacherName, programa_id:progId, hito_n:hitoN, criteria_checked:criteriaChecked,
     validated:allChecked, validated_by:currentProfile?.name||currentUser?.email||'',
     validated_at:allChecked?new Date().toISOString():null, notes, ciclo_escolar:'2026-2027', updated_at:new Date().toISOString()};
-  if (esLabS2) { payload.project_plan = plan; payload.implementation_dates = fechasImpl; }
+  if (conPlan) payload.project_plan = plan;
+  if (conFechas) payload.implementation_dates = fechasImpl;
+  if (conTipo) payload.observacion_tipo = tiposObs.join(', ');
   const btn = document.getElementById('hito-modal-save-btn');
   btn.disabled=true; btn.textContent='Guardando...';
   try {
@@ -1441,19 +1507,19 @@ async function saveHitoValidation() {
       if (created?.[0]) currentProgValidations.push(created[0]);
     }
     closeModal('modal-hito');
-    const nombre = progId==='lab' ? `${labTallerDe(hitoN).nombre} · Sesión ${labSesionDe(hitoN)}` : PROGRAMAS[progId].hitos.find(h=>h.n===hitoN).nombre;
-    notify(allChecked ? `✓ Validado: ${nombre}` : (esLabS2 && criteriaChecked.every(Boolean) ? 'Guardado — falta propuesta o fecha para validar' : 'Progreso guardado'));
+    const nombre = cfg ? `${tallerDe(progId, hitoN).nombre} · Sesión ${sesion}` : PROGRAMAS[progId].hitos.find(h=>h.n===hitoN).nombre;
+    notify(allChecked ? `✓ Validado: ${nombre}` : (criteriaChecked.every(Boolean) && (conPlan||conFechas||conTipo) ? 'Guardado — faltan datos de la sesión para validar' : 'Progreso guardado'));
     renderProgCards();
   } catch(e) {
     notify('Error al guardar. Verifica tu conexión.');
   } finally {
-    btn.disabled=false; btn.textContent = progId==='lab' ? 'Validar sesión' : 'Validar hito';
+    btn.disabled=false; btn.textContent = cfg ? 'Validar sesión' : 'Validar hito';
   }
 }
 
 // ===== EQUIPOS / RETOS =====
 const COLEGIADOS = ['Español','Matemáticas','Inglés','Especiales'];
-const TOTAL_HITOS_POR_DOCENTE = 19; // 10 aprendizaje + 9 lab (meta: 3 talleres × 3 sesiones)
+const TOTAL_HITOS_POR_DOCENTE = 25; // 10 aprendizaje + 9 lab (3 talleres × 3 ses.) + 6 clínicas (3 clínicas × 2 ses.)
 
 function switchProgView(view) {
   document.getElementById('vt-prog-docentes').classList.toggle('active', view==='docentes');
@@ -1509,9 +1575,14 @@ async function renderEquipos() {
 function miniBadgesHTML(achievedSet) {
   const rowA = PROGRAMAS.aprendizaje.hitos.map(h=>`<span class="mb-dot ${achievedSet.has('aprendizaje-'+h.n)?'on-a':''}" title="${h.nombre}"></span>`).join('');
   const rowL = PROGRAMAS.lab.hitos.map(h=>
-    [1,2,3].map(s=>`<span class="mb-dot ${achievedSet.has('lab-'+labHitoDe(h.n,s))?'on-l':''}" title="${h.nombre} · Sesión ${s}"></span>`).join('')).join('');
+    [1,2,3].map(s=>`<span class="mb-dot ${achievedSet.has('lab-'+tallerHitoDe('lab',h.n,s))?'on-l':''}" title="${h.nombre} · Sesión ${s}"></span>`).join('')).join('');
+  const rowC = PROGRAMAS.clinicas.hitos.map(h=>{
+    const completa = achievedSet.has('clinicas-'+h.n) && achievedSet.has('clinicas-'+tallerHitoDe('clinicas',h.n,2));
+    return `<span class="mb-dot ${completa?'on-c':''}" title="${h.nombre}"></span>`;
+  }).join('');
   return `<div class="mb-label">Aprendizaje Activo</div><div class="mb-row">${rowA}</div>
-          <div class="mb-label">Innovation Lab</div><div class="mb-row">${rowL}</div>`;
+          <div class="mb-label">Innovation Lab</div><div class="mb-row">${rowL}</div>
+          <div class="mb-label">Clínicas de estrategias</div><div class="mb-row">${rowC}</div>`;
 }
 
 async function renderChallengesFeed() {
@@ -3005,7 +3076,7 @@ async function generateFOPDF(formData, activityData) {
   const {
     leader_name, teacher_name, nivel, grupo, materia, objetivo,
     parte_clase, fecha, dominio, aspecto, respuestas, notas,
-    que_salio_bien, que_mejorar, compromisos, valoracion_general
+    que_salio_bien, que_mejorar, compromisos, valoracion_general, estrategias
   } = formData;
 
   // Get indicator texts for the domain/aspecto
@@ -3142,6 +3213,13 @@ ${valoracion_general !== null && valoracion_general !== undefined ? `
   </div>` : ''}
 </div>
 
+${(estrategias||[]).length ? `
+<!-- ESTRATEGIAS OBSERVADAS -->
+<div class="section-header" style="margin-top:8px">ESTRATEGIAS OBSERVADAS</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;margin-bottom:14px">
+  ${estrategias.map(e=>`<span style="font-size:11.5px;padding:3px 12px;border-radius:20px;background:#eef0f8;color:#344080;font-weight:500">${e}</span>`).join('')}
+</div>` : ''}
+
 <!-- FIRMAS -->
 <div class="firma-row">
   <div class="firma-box"><div style="margin-bottom:30px"></div>${leader_name || 'Líder académico'}<div style="margin-top:2px;font-size:10px">Observador</div></div>
@@ -3217,6 +3295,8 @@ async function loadAndGenerateLWPDF(activityId) {
     ${f.devolucion_positiva?`<div class="box"><div class="box-lbl">✓ Una cosa que funcionó bien</div><div class="box-val">${f.devolucion_positiva}</div></div>`:''}
     ${f.pregunta_reflexion?`<div class="box"><div class="box-lbl">? Pregunta que abre reflexión</div><div class="box-val">${f.pregunta_reflexion}</div></div>`:''}
     ${f.apertura_docente?`<div class="box"><div class="box-lbl">Apertura del docente</div><div class="box-val">${f.apertura_docente}</div></div>`:''}
+    ${(f.estrategias||[]).length?`<div class="section-header">Estrategias observadas</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${f.estrategias.map(e=>`<span style="font-size:11.5px;padding:3px 12px;border-radius:20px;background:#eef0f8;color:#344080;font-weight:500">${e}</span>`).join('')}</div>`:''}
     <div class="footer"><span>Christel House México · ObservaDoc</span><span>Generado el ${new Date().toLocaleDateString('es-MX')}</span></div>
     <scr`+`ipt>window.onload=()=>window.print();</scr`+`ipt></body></html>`;
     openPDFWindow(html);
@@ -3369,6 +3449,21 @@ function getScaleValues(prefix, count) {
     if (nota && nota.value.trim()) notas[i] = nota.value.trim();
   }
   return {respuestas, notas};
+}
+
+// ---- ESTRATEGIAS OBSERVADAS (checklist al final de LW y FO) ----
+function estrategiasChecklistHTML(name, selected=[]) {
+  return `<div style="font-size:12px;font-weight:500;color:var(--ink);background:var(--paper2);padding:7px 10px;border-radius:var(--r-sm);margin-top:14px;margin-bottom:10px">Estrategias observadas</div>
+    <div style="font-size:11.5px;color:var(--ink3);margin-bottom:8px">Marca las estrategias que el docente utilizó durante la sesión</div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:2px 14px;margin-bottom:6px">
+      ${ESTRATEGIAS_AULA.map(e=>`<label style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;cursor:pointer;font-size:12.5px;color:var(--ink);line-height:1.35">
+        <input type="checkbox" name="${name}" value="${e}" ${selected.includes(e)?'checked':''} style="margin-top:1px;width:15px;height:15px;accent-color:var(--ch-orange);flex-shrink:0">${e}
+      </label>`).join('')}
+    </div>`;
+}
+
+function getEstrategiasChecked(name) {
+  return [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(i=>i.value);
 }
 
 // ---- FO FORM ----
@@ -3554,6 +3649,7 @@ function renderFOStep(a) {
           </label>`).join('')}
         </div>
       </div>
+      ${estrategiasChecklistHTML('fo_estrategias')}
     </div>
     <div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:space-between">
       <button style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:var(--r-sm);font-size:13.5px;font-family:'Outfit',sans-serif;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--ink)" onclick="foStep=3;renderFOStep(currentFormActivity)">← Atrás</button>
@@ -3650,7 +3746,8 @@ async function submitFO() {
       que_salio_bien: bien,
       que_mejorar: mejorar,
       compromisos: document.getElementById('fo-compromisos')?.value,
-      valoracion_general: valoracionEl ? parseInt(valoracionEl.value) : null
+      valoracion_general: valoracionEl ? parseInt(valoracionEl.value) : null,
+      estrategias: getEstrategiasChecked('fo_estrategias')
     })});
     await sb(`activities?id=eq.${currentFormActivity.id}`, {method:'PATCH', body: JSON.stringify({status:'done'})});
     await loadActivities();
@@ -3711,6 +3808,7 @@ function buildFormLW(a) {
           </label>`).join('')}
         </div>
       </div>
+      ${estrategiasChecklistHTML('lw_estrategias')}
     </div>
     <div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">
       <button style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:var(--r-sm);font-size:13.5px;font-family:'Outfit',sans-serif;font-weight:500;cursor:pointer;border:none;background:#F59120;color:#fff" id="lw-submit-btn" onclick="submitLW()">Guardar LW ✓</button>
@@ -3748,7 +3846,8 @@ async function submitLW() {
       observaciones,
       devolucion_positiva: bien,
       pregunta_reflexion: document.getElementById('lw-pregunta')?.value,
-      apertura_docente: apertura
+      apertura_docente: apertura,
+      estrategias: getEstrategiasChecked('lw_estrategias')
     })});
     await sb(`activities?id=eq.${currentFormActivity.id}`,{method:'PATCH',body:JSON.stringify({status:'done'})});
     await loadActivities();
