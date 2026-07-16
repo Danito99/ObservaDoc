@@ -318,7 +318,7 @@ textarea.fc{resize:vertical;min-height:70px}
 .mb-dot{width:15px;height:15px;border-radius:50%;background:var(--paper2);flex-shrink:0}
 .mb-dot.on-a{background:var(--ch-orange)}
 .mb-dot.on-l{background:var(--lab-green)}.mb-dot.on-c{background:var(--violet)}
-@media(max-width:860px){.prog-grid{grid-template-columns:1fr}.hitos-grid{grid-template-columns:repeat(2,1fr)}#equipos-grid{grid-template-columns:1fr!important}}
+@media(max-width:860px){.prog-grid{grid-template-columns:1fr}.hitos-grid{grid-template-columns:repeat(2,1fr)}#equipos-grid{grid-template-columns:1fr!important}.rpt-prog-2col{grid-template-columns:1fr!important}}
 
 /* MOBILE NAV */
 .mobile-menu-btn{display:none}
@@ -615,6 +615,7 @@ textarea.fc{resize:vertical;min-height:70px}
         <button class="rpt-tab" id="rtab-lw" onclick="switchRptTab('lw')" style="padding:8px 18px;border:none;background:none;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--ink3);border-bottom:2px solid transparent">Learning Walk</button>
         <button class="rpt-tab" id="rtab-fb" onclick="switchRptTab('fb')" style="padding:8px 18px;border:none;background:none;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--ink3);border-bottom:2px solid transparent">Feedback</button>
         <button class="rpt-tab" id="rtab-mc" onclick="switchRptTab('mc')" style="padding:8px 18px;border:none;background:none;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--ink3);border-bottom:2px solid transparent">Modelaje</button>
+        <button class="rpt-tab" id="rtab-prog" onclick="switchRptTab('prog')" style="padding:8px 18px;border:none;background:none;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--ink3);border-bottom:2px solid transparent">◆ Programas</button>
       </div>
 
       <div id="rpt-overview-panel"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
@@ -622,6 +623,7 @@ textarea.fc{resize:vertical;min-height:70px}
       <div id="rpt-lw-panel" style="display:none"></div>
       <div id="rpt-fb-panel" style="display:none"></div>
       <div id="rpt-mc-panel" style="display:none"></div>
+      <div id="rpt-prog-panel" style="display:none"></div>
     </div>
 
     <!-- GESTIONAR -->
@@ -2170,18 +2172,19 @@ function downloadICS(id){
 
 
 // ===================== REPORTES =====================
-let rptData = {lw:[], fo:[], mc:[], fb:[]};
+let rptData = {lw:[], fo:[], mc:[], fb:[], badges:[]};
 let currentRptTab = 'overview';
 
 async function loadReportData() {
   try {
-    const [lw, fo, mc, fb] = await Promise.all([
+    const [lw, fo, mc, fb, badges] = await Promise.all([
       sb('form_lw?order=created_at.desc'),
       sb('form_fo?order=created_at.desc'),
       sb('form_mc?order=created_at.desc'),
       sb('form_fb?order=created_at.desc'),
+      sb('badge_validations?ciclo_escolar=eq.2026-2027&programa_id=neq.gamificacion'),
     ]);
-    rptData = {lw, fo, mc, fb};
+    rptData = {lw, fo, mc, fb, badges};
   } catch(e) { console.error('Error loading report data', e); }
 }
 
@@ -2339,6 +2342,124 @@ function renderReportes() {
   else if (currentRptTab === 'lw') renderRptLW();
   else if (currentRptTab === 'fb') renderRptFB();
   else if (currentRptTab === 'mc') renderRptMC();
+  else if (currentRptTab === 'prog') renderRptProg();
+}
+
+// ---- PROGRAMAS DASHBOARD ----
+const PROG_RPT_COLORS = {aprendizaje:'#F59120', lab:'#2e8b5b', clinicas:'#44579C'};
+const MES_NOMBRES = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+
+function filterBadgeRows() {
+  const f = getRptFilters();
+  return (rptData.badges||[]).filter(b => {
+    if (f.docente && b.teacher_name !== f.docente) return false;
+    if (f.lider && b.validated_by !== f.lider) return false;
+    if (f.mes && (!b.validated_at || MES_NOMBRES[new Date(b.validated_at).getMonth()] !== f.mes)) return false;
+    return true;
+  });
+}
+
+function renderRptProg() {
+  const panel = document.getElementById('rpt-prog-panel');
+  const f = getRptFilters();
+  const rows = filterBadgeRows();
+  if (!rows.length) { panel.innerHTML = '<div class="empty"><div class="empty-icon">◌</div><p>Sin avance de programas con estos filtros</p></div>'; return; }
+
+  const totalDocentes = f.docente ? 1 : teachers.filter(t=>t.active!==false).length || 1;
+  const validadas = rows.filter(b=>b.validated);
+  const docentesConAvance = new Set(validadas.map(b=>b.teacher_name)).size;
+
+  // Inscripciones (docente × unidad) por programa tipo taller
+  const inscripciones = {};
+  ['lab','clinicas'].forEach(pid => {
+    inscripciones[pid] = new Set(rows.filter(b=>b.programa_id===pid).map(b=>`${b.teacher_name}|${tallerDe(pid,b.hito_n)?.n}`));
+  });
+
+  let html = `<div class="stats" style="margin-bottom:20px">
+    ${statCard('Sesiones e hitos validados', validadas.length, 'en los tres programas', '#F59120')}
+    ${statCard('Docentes con avance', docentesConAvance, `de ${totalDocentes} activos`, '#2B91CF')}
+    ${statCard('Inscripciones al Lab', inscripciones.lab.size, 'docente × taller', '#2e8b5b')}
+    ${statCard('Inscripciones a clínicas', inscripciones.clinicas.size, 'docente × clínica', '#44579C')}
+  </div>`;
+
+  // ---- Lecciones Atractivas: avance por hito ----
+  const apr = validadas.filter(b=>b.programa_id==='aprendizaje');
+  html += vizCard(`${PROGRAMAS.aprendizaje.title} — docentes con cada hito validado`,
+    apr.length
+      ? PROGRAMAS.aprendizaje.hitos.map(h => {
+          const n = new Set(apr.filter(b=>b.hito_n===h.n).map(b=>b.teacher_name)).size;
+          return hBar(`${h.n}. ${h.nombre}`, n/totalDocentes*100, PROG_RPT_COLORS.aprendizaje, `${n}/${totalDocentes}`);
+        }).join('')
+      : '<div style="font-size:12.5px;color:var(--ink3)">Sin hitos validados todavía</div>',
+    PROG_RPT_COLORS.aprendizaje);
+
+  // ---- Innovation Lab: inscripciones y sesiones por taller ----
+  const labRows = rows.filter(b=>b.programa_id==='lab');
+  html += vizCard('Talleres Innovation Lab — inscripciones y sesiones validadas',
+    labRows.length
+      ? PROGRAMAS.lab.hitos.map(h => {
+          const inscritos = new Set(labRows.filter(b=>tallerDe('lab',b.hito_n)?.n===h.n).map(b=>b.teacher_name)).size;
+          const sesVal = labRows.filter(b=>b.validated && tallerDe('lab',b.hito_n)?.n===h.n).length;
+          const posibles = inscritos*3 || 1;
+          return hBar(h.nombre, sesVal/posibles*100, PROG_RPT_COLORS.lab, `${inscritos} inscritos · ${sesVal}/${inscritos*3} ses.`);
+        }).join('')
+      : '<div style="font-size:12.5px;color:var(--ink3)">Sin inscripciones al Lab todavía</div>',
+    PROG_RPT_COLORS.lab);
+
+  // ---- Clínicas: inscripciones por estrategia y tipos de observación ----
+  const clinRows = rows.filter(b=>b.programa_id==='clinicas');
+  const clinConDatos = PROGRAMAS.clinicas.hitos
+    .map(h => {
+      const inscritos = new Set(clinRows.filter(b=>tallerDe('clinicas',b.hito_n)?.n===h.n).map(b=>b.teacher_name)).size;
+      const sesVal = clinRows.filter(b=>b.validated && tallerDe('clinicas',b.hito_n)?.n===h.n).length;
+      return {h, inscritos, sesVal};
+    })
+    .filter(x=>x.inscritos>0)
+    .sort((a,b)=>b.inscritos-a.inscritos);
+  const maxClin = Math.max(...clinConDatos.map(x=>x.inscritos), 1);
+  const tiposObs = {};
+  OBSERVACION_TIPOS.forEach(t=>tiposObs[t]=0);
+  clinRows.forEach(b=>(b.observacion_tipo||'').split(', ').filter(Boolean).forEach(t=>{ if(tiposObs[t]!==undefined) tiposObs[t]++; }));
+  const totalTipos = Object.values(tiposObs).reduce((a,b)=>a+b,0);
+  html += `<div style="display:grid;grid-template-columns:2fr 1fr;gap:16px" class="rpt-prog-2col">
+    <div>${vizCard('Clínicas de estrategias — docentes inscritos',
+      clinConDatos.length
+        ? clinConDatos.map(x=>hBar(x.h.nombre, x.inscritos/maxClin*100, PROG_RPT_COLORS.clinicas, `${x.inscritos} inscritos · ${x.sesVal}/${x.inscritos*2} ses.`)).join('')
+        : '<div style="font-size:12.5px;color:var(--ink3)">Sin inscripciones a clínicas todavía</div>',
+      PROG_RPT_COLORS.clinicas)}</div>
+    <div>${vizCard('Observaciones agendadas por tipo',
+      totalTipos
+        ? Object.entries(tiposObs).map(([t,n])=>hBar(t, n/totalTipos*100, PROG_RPT_COLORS.clinicas, String(n))).join('')
+        : '<div style="font-size:12.5px;color:var(--ink3)">Sin observaciones agendadas</div>',
+      PROG_RPT_COLORS.clinicas)}</div>
+  </div>`;
+
+  // ---- Próximas fechas agendadas (implementaciones Lab y observaciones de clínicas) ----
+  const hoy = new Date().toISOString().slice(0,10);
+  const agenda = rows
+    .filter(b=>(b.implementation_dates||[]).length)
+    .flatMap(b => b.implementation_dates.map(d => ({
+      fecha: d, teacher: b.teacher_name,
+      unidad: tallerDe(b.programa_id, b.hito_n)?.nombre || '',
+      etiqueta: b.programa_id==='lab' ? 'Implementación Lab' : (b.observacion_tipo || 'Observación'),
+      color: PROG_RPT_COLORS[b.programa_id],
+      pasada: d < hoy, validada: b.validated,
+    })))
+    .filter(x=>!x.pasada || !x.validada)
+    .sort((a,b)=>a.fecha.localeCompare(b.fecha))
+    .slice(0,15);
+  html += vizCard('Agenda de implementaciones y observaciones',
+    agenda.length
+      ? agenda.map(x=>`<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12.5px">
+          <span style="font-weight:600;color:${x.pasada?'#b91c1c':'var(--ink)'};min-width:78px">${new Date(x.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'short'})}${x.pasada?' ⚠':''}</span>
+          <span style="flex:1;color:var(--ink)">${x.teacher}</span>
+          <span style="color:var(--ink3)">${x.unidad}</span>
+          <span style="font-size:10.5px;font-weight:600;padding:2px 9px;border-radius:99px;background:var(--paper2);color:${x.color}">${x.etiqueta}</span>
+        </div>`).join('') + '<div style="font-size:11px;color:var(--ink3);margin-top:8px">⚠ = fecha pasada sin sesión validada</div>'
+      : '<div style="font-size:12.5px;color:var(--ink3)">No hay fechas agendadas</div>',
+    '#0891b2');
+
+  panel.innerHTML = html;
 }
 
 // ---- OVERVIEW ----
@@ -2750,7 +2871,7 @@ function renderRptMC() {
 
 function switchRptTab(tab) {
   currentRptTab = tab;
-  ['overview','fo','lw','fb','mc'].forEach(t => {
+  ['overview','fo','lw','fb','mc','prog'].forEach(t => {
     const btn = document.getElementById('rtab-'+t);
     const panel = document.getElementById('rpt-'+t+'-panel');
     if(btn && panel){
