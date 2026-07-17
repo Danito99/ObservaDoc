@@ -4436,33 +4436,38 @@ async function saveCoachingPlan() {
       habilidades_por_desarrollar: document.getElementById('cd-hab-por').value,
       updated_at: new Date().toISOString()
     })});
-    notify('Plan guardado ✓');
+    for (const c of currentCoachingCycles) await patchCoachingCycle(c.numero_ciclo);
+    notify('Plan y ciclos guardados ✓');
   } catch(e) { notify('Error al guardar el plan'); }
 }
 
-async function saveCoachingCycle(n) {
+async function patchCoachingCycle(n) {
   const cycle = currentCoachingCycles.find(c => c.numero_ciclo === n);
   if (!cycle) return;
+  await sb(`coaching_cycles?id=eq.${cycle.id}`, { method: 'PATCH', body: JSON.stringify({
+    enfoque: document.getElementById(`cy-enfoque-${n}`)?.value,
+    responsable: document.getElementById(`cy-responsable-${n}`)?.value,
+    fecha_inicio: document.getElementById(`cy-inicio-${n}`)?.value || null,
+    fecha_cierre: document.getElementById(`cy-cierre-${n}`)?.value || null,
+    practicas: document.getElementById(`cy-practicas-${n}`)?.value,
+    monitoreo: document.getElementById(`cy-monitoreo-${n}`)?.value,
+    pasos_previos: document.getElementById(`cy-previos-${n}`)?.value,
+    avances: document.getElementById(`cy-avances-${n}`)?.value,
+    dificultades: document.getElementById(`cy-dificultades-${n}`)?.value,
+    compromisos: document.getElementById(`cy-compromisos-${n}`)?.value,
+    notas: document.getElementById(`cy-notas-${n}`)?.value,
+    sesiones_grupales: cycle.sesiones_grupales || 0,
+    updated_at: new Date().toISOString()
+  })});
+  // Actualizar ciclo local
+  cycle.responsable = document.getElementById(`cy-responsable-${n}`)?.value;
+  cycle.fecha_inicio = document.getElementById(`cy-inicio-${n}`)?.value;
+  cycle.fecha_cierre = document.getElementById(`cy-cierre-${n}`)?.value;
+}
+
+async function saveCoachingCycle(n) {
   try {
-    await sb(`coaching_cycles?id=eq.${cycle.id}`, { method: 'PATCH', body: JSON.stringify({
-      enfoque: document.getElementById(`cy-enfoque-${n}`)?.value,
-      responsable: document.getElementById(`cy-responsable-${n}`)?.value,
-      fecha_inicio: document.getElementById(`cy-inicio-${n}`)?.value || null,
-      fecha_cierre: document.getElementById(`cy-cierre-${n}`)?.value || null,
-      practicas: document.getElementById(`cy-practicas-${n}`)?.value,
-      monitoreo: document.getElementById(`cy-monitoreo-${n}`)?.value,
-      pasos_previos: document.getElementById(`cy-previos-${n}`)?.value,
-      avances: document.getElementById(`cy-avances-${n}`)?.value,
-      dificultades: document.getElementById(`cy-dificultades-${n}`)?.value,
-      compromisos: document.getElementById(`cy-compromisos-${n}`)?.value,
-      notas: document.getElementById(`cy-notas-${n}`)?.value,
-      sesiones_grupales: cycle.sesiones_grupales || 0,
-      updated_at: new Date().toISOString()
-    })});
-    // Actualizar ciclo local
-    cycle.responsable = document.getElementById(`cy-responsable-${n}`)?.value;
-    cycle.fecha_inicio = document.getElementById(`cy-inicio-${n}`)?.value;
-    cycle.fecha_cierre = document.getElementById(`cy-cierre-${n}`)?.value;
+    await patchCoachingCycle(n);
     notify(`Ciclo ${n} guardado ✓`);
   } catch(e) { notify('Error al guardar el ciclo'); }
 }
