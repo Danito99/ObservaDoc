@@ -1977,6 +1977,10 @@ function renderGestionar(){
           <option value="">Sin colegiado</option>
           ${['Español','Matemáticas','Inglés','Especiales'].map(c=>`<option value="${c}"${t.colegiado===c?' selected':''}>${c}</option>`).join('')}
         </select>
+        <select class="fc" style="width:150px;margin:0;padding:6px 9px;font-size:12px" onchange="setFlotilla('${t.id}',this.value)">
+          <option value="">Sin flotilla</option>
+          ${FLOTILLAS.map(c=>`<option value="${c}"${t.flotilla===c?' selected':''}>${c}</option>`).join('')}
+        </select>
         <button class="btn btn-danger btn-sm" onclick="toggleTeacher('${t.id}',${t.active})">${t.active?'Desactivar':'Activar'}</button>
       </div>`).join('')
     :'<div class="empty"><p>No hay docentes aún</p></div>';
@@ -1992,6 +1996,7 @@ async function addTeacher(){const name=document.getElementById('new-teacher-name
 async function addLeader(){const name=document.getElementById('new-leader-name').value.trim();if(!name)return;await sb('leaders',{method:'POST',body:JSON.stringify({name,active:true})});document.getElementById('new-leader-name').value='';await loadLeaders();populateSelects();renderGestionar();notify('Líder agregado ✓');}
 async function toggleTeacher(id,active){await sb(`teachers?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({active:!active})});await loadTeachers();populateSelects();renderGestionar();}
 async function setColegiado(id,colegiado){await sb(`teachers?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({colegiado:colegiado||null})});await loadTeachers();notify('Colegiado actualizado ✓');}
+async function setFlotilla(id,flotilla){await sb(`teachers?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({flotilla:flotilla||null})});await loadTeachers();notify('Flotilla actualizada ✓');}
 async function toggleLeader(id,active){await sb(`leaders?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({active:!active})});await loadLeaders();populateSelects();renderGestionar();}
 
 // MODAL ACTIVITY
@@ -2347,6 +2352,7 @@ function renderReportes() {
 
 // ---- PROGRAMAS DASHBOARD ----
 const PROG_RPT_COLORS = {aprendizaje:'#F59120', lab:'#2e8b5b', clinicas:'#44579C'};
+const FLOTILLAS = ['Flota Ancla','Flota Vela','Flota Timón','Flota Faro'];
 const MES_NOMBRES = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
 
 function filterBadgeRows() {
@@ -2391,6 +2397,24 @@ function renderRptProg() {
           return hBar(`${h.n}. ${h.nombre}`, n/totalDocentes*100, PROG_RPT_COLORS.aprendizaje, `${n}/${totalDocentes}`);
         }).join('')
       : '<div style="font-size:12.5px;color:var(--ink3)">Sin hitos validados todavía</div>',
+    PROG_RPT_COLORS.aprendizaje);
+
+  // ---- Aprendizaje Activo: avance por flotilla ----
+  const totalHitosApr = PROGRAMAS.aprendizaje.hitos.length;
+  const flotillaStats = FLOTILLAS.map(fl => {
+    const miembros = teachers.filter(t => t.active!==false && t.flotilla===fl);
+    const nombres = miembros.map(m=>m.name);
+    const validasFlotilla = apr.filter(b => nombres.includes(b.teacher_name));
+    const posible = miembros.length * totalHitosApr;
+    const pct = posible ? Math.min(100, Math.round(validasFlotilla.length / posible * 100)) : 0;
+    return {fl, miembros: miembros.length, validados: validasFlotilla.length, posible, pct};
+  });
+  const sinFlotilla = teachers.filter(t => t.active!==false && !t.flotilla).length;
+  html += vizCard(`${PROGRAMAS.aprendizaje.title} — avance por flotilla`,
+    flotillaStats.some(s=>s.miembros>0)
+      ? flotillaStats.map(s => hBar(s.fl, s.pct, PROG_RPT_COLORS.aprendizaje, s.miembros ? `${s.validados}/${s.posible} · ${s.pct}%` : 'sin docentes')).join('')
+        + (sinFlotilla ? `<div style="font-size:11.5px;color:var(--ink3);margin-top:8px">${sinFlotilla} docente${sinFlotilla===1?'':'s'} sin flotilla asignada</div>` : '')
+      : '<div style="font-size:12.5px;color:var(--ink3)">Sin docentes asignados a flotillas todavía</div>',
     PROG_RPT_COLORS.aprendizaje);
 
   // ---- Innovation Lab: inscripciones y sesiones por taller ----
