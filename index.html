@@ -278,6 +278,12 @@ textarea.fc{resize:vertical;min-height:70px}
 .hito-status{display:inline-block;margin-top:5px;font-size:9.5px;font-weight:600;padding:1px 6px;border-radius:99px}
 .hito.logrado .hito-status{background:#edf7ed;color:#2a6e24}
 .hito:not(.logrado) .hito-status{background:var(--paper2);color:var(--ink3)}
+.hito-visitas{display:flex;gap:4px;justify-content:center;margin-top:6px}
+.hito-visita{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;border:1px solid var(--border);border-radius:6px;background:var(--paper2);padding:4px 2px;cursor:pointer;font-family:inherit;font-size:8.5px;font-weight:600;color:var(--ink3);transition:.15s}
+.hito-visita:hover{border-color:var(--ch-orange)}
+.hito-visita.hv-done{background:rgba(245,145,32,.15);border-color:rgba(245,145,32,.4);color:var(--ch-orange)}
+.hito-visita.hv-progreso{background:var(--amber-bg,#fef3e2);border-color:#f0c987;color:#c4700a}
+.hv-num{font-size:11px}
 /* TALLERES INNOVATION LAB */
 .talleres-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
 .lab-resumen{grid-column:1/-1;font-size:12px;color:var(--ink2);padding:8px 12px;background:var(--paper);border:1px solid var(--border);border-radius:var(--r-sm)}
@@ -914,6 +920,17 @@ textarea.fc{resize:vertical;min-height:70px}
   </div>
 </div>
 
+<!-- MODAL DETALLE FLOTILLA -->
+<div class="modal-overlay" id="modal-flotilla">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3 id="flotilla-detail-title">Flotilla</h3>
+      <button class="modal-close" onclick="closeModal('modal-flotilla')">✕</button>
+    </div>
+    <div class="modal-body" id="flotilla-detail-body"></div>
+  </div>
+</div>
+
 <!-- MODAL DETALLE -->
 <div class="modal-overlay" id="modal-detail">
   <div class="modal">
@@ -1117,14 +1134,14 @@ const PROGRAMAS = {
     desc: '10 competencias · sesiones de 1:30 h',
     hitos: [
       {n:1,nombre:'Lanzamiento',desc:'Propósito y marco del plan anual'},
-      {n:2,nombre:'Aumento de Ratio',desc:'Maximizar el trabajo cognitivo del alumno'},
-      {n:3,nombre:'The Hook',desc:'Capturar el interés desde el inicio'},
-      {n:4,nombre:'The Joy Factor',desc:'Energía del salón alta y enfocada'},
-      {n:5,nombre:'ABP — Lanzamiento',desc:'El gancho del proyecto',esABP:true},
-      {n:6,nombre:'ABP — Planificación',desc:'Hoja de ruta del proyecto',esABP:true},
-      {n:7,nombre:'ABP — Investigación',desc:'Corazón del proyecto',esABP:true},
-      {n:8,nombre:'ABP — Presentación',desc:'La cumbre del proyecto',esABP:true},
-      {n:9,nombre:'ABP — Reflexión',desc:'Cierre metacognitivo del proyecto',esABP:true},
+      {n:2,nombre:'Aumento de Ratio',desc:'Maximizar el trabajo cognitivo del alumno',visitas:2},
+      {n:3,nombre:'The Hook',desc:'Capturar el interés desde el inicio',visitas:2},
+      {n:4,nombre:'The Joy Factor',desc:'Energía del salón alta y enfocada',visitas:2},
+      {n:5,nombre:'ABP — Lanzamiento',desc:'El gancho del proyecto',esABP:true,visitas:2},
+      {n:6,nombre:'ABP — Planificación',desc:'Hoja de ruta del proyecto',esABP:true,visitas:2},
+      {n:7,nombre:'ABP — Investigación',desc:'Corazón del proyecto',esABP:true,visitas:2},
+      {n:8,nombre:'ABP — Presentación',desc:'La cumbre del proyecto',esABP:true,visitas:2},
+      {n:9,nombre:'ABP — Reflexión',desc:'Cierre metacognitivo del proyecto',esABP:true,visitas:2},
       {n:10,nombre:'Cierre integral',desc:'Gran mapa de competencias del ciclo'},
     ],
   },
@@ -1222,6 +1239,31 @@ PROGRAMAS.clinicas.hitos.forEach(h => {
   HITO_CRITERIA.clinicas[tallerHitoDe('clinicas', h.n, 2)] = CLINICA_S2_CRITERIA;
 });
 
+// Hitos que requieren 2 observaciones (p.ej. aprendizaje 2–9): cada observación se guarda
+// como un registro aparte en badge_validations, con hito_n = n + (observación−1)×100.
+const VISITA_OFFSET = 100;
+function hitoVisitaN(h, visita){ return h.n + (visita-1)*VISITA_OFFSET; }
+function hitosCompletadosMultiVisita(progId, validatedHitoNs){
+  return PROGRAMAS[progId].hitos.filter(h => {
+    const req = h.visitas || 1;
+    for (let v=1; v<=req; v++) if (!validatedHitoNs.includes(hitoVisitaN(h,v))) return false;
+    return true;
+  });
+}
+function docentesConHitoCompleto(rows, h){
+  const req = h.visitas || 1;
+  if (req <= 1) return new Set(rows.filter(b=>b.hito_n===h.n).map(b=>b.teacher_name));
+  const visitasPorDocente = {};
+  rows.forEach(b => {
+    for (let v=1; v<=req; v++) {
+      if (b.hito_n === hitoVisitaN(h,v)) {
+        (visitasPorDocente[b.teacher_name] = visitasPorDocente[b.teacher_name] || new Set()).add(v);
+      }
+    }
+  });
+  return new Set(Object.keys(visitasPorDocente).filter(t => visitasPorDocente[t].size >= req));
+}
+
 function getRangoProg(completados, progId, hitos) {
   const cfg = TALLER_CFG[progId];
   if (cfg) {
@@ -1243,12 +1285,33 @@ function getRangoProg(completados, progId, hitos) {
 function hitoCardHTML(h, completados, teacherName, progId) {
   const done = completados.includes(h.n);
   const tn = (teacherName||'').replace(/'/g,"\\'");
-  return `<div class="hito ${done?'logrado':''}" onclick="openHitoModal('${progId}',${h.n},'${tn}')" title="Haga clic para ver criterios">
+  const req = h.visitas || 1;
+  if (req <= 1) {
+    return `<div class="hito ${done?'logrado':''}" onclick="openHitoModal('${progId}',${h.n},'${tn}')" title="Haga clic para ver criterios">
+      <div class="hito-icon">${done?'✓':h.n}</div>
+      <div class="hito-n">${h.nombre}</div>
+      <div class="hito-sub">${h.desc}</div>
+      ${h.esABP?'<span class="hito-abp">ABP</span>':''}${h.esClase?'<span class="hito-lab">Práctica</span>':''}
+      <span class="hito-status">${done?'Validado':'Pendiente'}</span>
+    </div>`;
+  }
+  const visitas = Array.from({length:req}, (_,i)=>i+1).map(v => {
+    const hn = hitoVisitaN(h, v);
+    const val = currentProgValidations.find(x=>x.programa_id===progId && x.hito_n===hn);
+    const vdone = !!val?.validated;
+    const enProgreso = !vdone && !!val && ((val.criteria_checked||[]).some(Boolean) || val.notes);
+    return `<button type="button" class="hito-visita ${vdone?'hv-done':enProgreso?'hv-progreso':''}" title="Observación ${v} de ${req}" onclick="event.stopPropagation();openHitoModal('${progId}',${hn},'${tn}')">
+      <span class="hv-num">${vdone?'✓':v}</span>Obs.${v}
+    </button>`;
+  }).join('');
+  const validadas = Array.from({length:req}, (_,i)=>i+1).filter(v=>currentProgValidations.find(x=>x.programa_id===progId && x.hito_n===hitoVisitaN(h,v))?.validated).length;
+  return `<div class="hito ${done?'logrado':''}" title="Requiere 2 observaciones en clases distintas">
     <div class="hito-icon">${done?'✓':h.n}</div>
     <div class="hito-n">${h.nombre}</div>
     <div class="hito-sub">${h.desc}</div>
-    ${h.esABP?'<span class="hito-abp">ABP</span>':''}${h.esClase?'<span class="hito-lab">Práctica</span>':''}
-    <span class="hito-status">${done?'Validado':'Pendiente'}</span>
+    ${h.esABP?'<span class="hito-abp">ABP</span>':''}
+    <div class="hito-visitas">${visitas}</div>
+    <span class="hito-status">${done?'Validado':`${validadas}/${req} obs.`}</span>
   </div>`;
 }
 
@@ -1263,10 +1326,10 @@ async function renderProgramas() {
   if (!filtered.length) { grid.innerHTML = '<div class="empty"><p>No se encontraron docentes</p></div>'; return; }
   grid.innerHTML = '<div class="loading"><div class="spinner"></div>Cargando...</div>';
   let allVals = [];
-  try { allVals = await sb('badge_validations?ciclo_escolar=eq.2026-2027&validated=eq.true&programa_id=neq.gamificacion&select=teacher_name,programa_id'); } catch(e) {}
+  try { allVals = await sb('badge_validations?ciclo_escolar=eq.2026-2027&validated=eq.true&programa_id=neq.gamificacion&select=teacher_name,programa_id,hito_n'); } catch(e) {}
   grid.innerHTML = filtered.map(t => {
     const tv = allVals.filter(v=>v.teacher_name===t.name);
-    const cA = tv.filter(v=>v.programa_id==='aprendizaje').length;
+    const cA = hitosCompletadosMultiVisita('aprendizaje', tv.filter(v=>v.programa_id==='aprendizaje').map(v=>v.hito_n)).length;
     const cL = tv.filter(v=>v.programa_id==='lab').length;
     const cC = tv.filter(v=>v.programa_id==='clinicas').length;
     return `<div class="teacher-card" onclick="openTeacherProgramas('${t.name.replace(/'/g,"\\'")}')">
@@ -1320,7 +1383,8 @@ function renderProgCards() {
   const cards = document.getElementById('prog-cards');
   if (!cards || !currentProgTeacher) return;
   cards.innerHTML = Object.entries(PROGRAMAS).map(([id,p]) => {
-    const completados = currentProgValidations.filter(v=>v.programa_id===id && v.validated).map(v=>v.hito_n);
+    const rawValidados = currentProgValidations.filter(v=>v.programa_id===id && v.validated).map(v=>v.hito_n);
+    const completados = TALLER_CFG[id] ? rawValidados : hitosCompletadosMultiVisita(id, rawValidados).map(h=>h.n);
     const r = getRangoProg(completados, id, p.hitos);
     const cfg = TALLER_CFG[id];
     const pct = cfg ? Math.min(100, Math.round(completados.length/tallerMetaSesiones(id)*100))
@@ -1346,7 +1410,8 @@ function renderProgCards() {
 
 function renderProgHitos(progId) {
   const p = PROGRAMAS[progId];
-  const completados = currentProgValidations.filter(v=>v.programa_id===progId && v.validated).map(v=>v.hito_n);
+  const rawValidados = currentProgValidations.filter(v=>v.programa_id===progId && v.validated).map(v=>v.hito_n);
+  const completados = TALLER_CFG[progId] ? rawValidados : hitosCompletadosMultiVisita(progId, rawValidados).map(h=>h.n);
   const r = getRangoProg(completados, progId, p.hitos);
   document.getElementById('prog-detail-label').textContent = p.label;
   document.getElementById('prog-detail-title').textContent = p.title;
@@ -1426,15 +1491,17 @@ async function quitarInscripcionTaller(progId, tallerN) {
 function openHitoModal(progId, hitoN, teacherName) {
   currentHitoContext = {progId, hitoN, teacherName};
   const cfg = TALLER_CFG[progId];
-  const hito = cfg ? tallerDe(progId, hitoN) : PROGRAMAS[progId].hitos.find(h=>h.n===hitoN);
+  const baseN = cfg ? hitoN : (hitoN > VISITA_OFFSET ? hitoN - VISITA_OFFSET : hitoN);
+  const hito = cfg ? tallerDe(progId, hitoN) : PROGRAMAS[progId].hitos.find(h=>h.n===baseN);
   const sesion = cfg ? tallerSesionDe(progId, hitoN) : null;
+  const visitaN = (!cfg && hito.visitas > 1) ? (hitoN > VISITA_OFFSET ? 2 : 1) : null;
   const existing = currentProgValidations.find(v=>v.programa_id===progId && v.hito_n===hitoN);
-  const criteria = HITO_CRITERIA[progId][hitoN] || [];
+  const criteria = HITO_CRITERIA[progId][cfg ? hitoN : baseN] || [];
   const checked = existing?.criteria_checked || [];
   document.getElementById('hito-modal-title').textContent = cfg
     ? `${hito.nombre} · Sesión ${sesion}: ${cfg.sesiones[sesion]}`
-    : `Hito ${hitoN} · ${hito.nombre}`;
-  document.getElementById('hito-modal-save-btn').textContent = existing?.validated ? 'Actualizar' : (cfg ? 'Validar sesión' : 'Validar hito');
+    : (visitaN ? `Hito ${baseN} · ${hito.nombre} · Observación ${visitaN} de ${hito.visitas}` : `Hito ${hitoN} · ${hito.nombre}`);
+  document.getElementById('hito-modal-save-btn').textContent = existing?.validated ? 'Actualizar' : (cfg ? 'Validar sesión' : (visitaN ? 'Guardar observación' : 'Validar hito'));
   const fechas = existing?.implementation_dates || [];
   const tiposSel = (existing?.observacion_tipo||'').split(', ').filter(Boolean);
   const lblSty = 'font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);display:block;margin-bottom:6px';
@@ -1460,6 +1527,7 @@ function openHitoModal(progId, hitoN, teacherName) {
     </div>`;
   document.getElementById('hito-modal-body').innerHTML = `
     <div style="font-size:12px;color:var(--ink3);margin-bottom:16px">${cfg?cfg.sesiones[sesion]+' — '+hito.nombre:hito.desc} · <b>${teacherName}</b></div>
+    ${visitaN?`<div style="font-size:11.5px;color:var(--ch-orange);margin-bottom:14px;font-weight:500">Este hito requiere 2 observaciones en clases distintas. Esta es la observación ${visitaN} de ${hito.visitas}.</div>`:''}
     <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);margin-bottom:10px">Criterios observables</div>
     ${criteria.map((c,i)=>`<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;color:var(--ink);line-height:1.4">
       <input type="checkbox" id="hc-${i}" style="margin-top:2px;width:15px;height:15px;accent-color:var(--ch-orange);flex-shrink:0" ${checked[i]?'checked':''}>${c}</label>`).join('')}
@@ -1480,10 +1548,11 @@ function agregarFechaImpl() {
 
 async function saveHitoValidation() {
   const {progId, hitoN, teacherName} = currentHitoContext;
-  const criteria = HITO_CRITERIA[progId][hitoN] || [];
+  const cfg = TALLER_CFG[progId];
+  const baseN = cfg ? hitoN : (hitoN > VISITA_OFFSET ? hitoN - VISITA_OFFSET : hitoN);
+  const criteria = HITO_CRITERIA[progId][cfg ? hitoN : baseN] || [];
   const criteriaChecked = criteria.map((_,i) => !!document.getElementById(`hc-${i}`)?.checked);
   const notes = document.getElementById('hito-notes')?.value || '';
-  const cfg = TALLER_CFG[progId];
   const sesion = cfg ? tallerSesionDe(progId, hitoN) : null;
   const conPlan = cfg?.planSesion === sesion, conFechas = cfg?.fechasSesion === sesion, conTipo = cfg?.tipoSesion === sesion;
   const plan = conPlan ? (document.getElementById('hito-plan')?.value || '').trim() : null;
@@ -1509,7 +1578,7 @@ async function saveHitoValidation() {
       if (created?.[0]) currentProgValidations.push(created[0]);
     }
     closeModal('modal-hito');
-    const nombre = cfg ? `${tallerDe(progId, hitoN).nombre} · Sesión ${sesion}` : PROGRAMAS[progId].hitos.find(h=>h.n===hitoN).nombre;
+    const nombre = cfg ? `${tallerDe(progId, hitoN).nombre} · Sesión ${sesion}` : PROGRAMAS[progId].hitos.find(h=>h.n===baseN).nombre;
     notify(allChecked ? `✓ Validado: ${nombre}` : (criteriaChecked.every(Boolean) && (conPlan||conFechas||conTipo) ? 'Guardado — faltan datos de la sesión para validar' : 'Progreso guardado'));
     renderProgCards();
   } catch(e) {
@@ -1520,8 +1589,9 @@ async function saveHitoValidation() {
 }
 
 // ===== EQUIPOS / RETOS =====
-const COLEGIADOS = ['Español','Matemáticas','Inglés','Especiales'];
-const TOTAL_HITOS_POR_DOCENTE = 25; // 10 aprendizaje + 9 lab (3 talleres × 3 ses.) + 6 clínicas (3 clínicas × 2 ses.)
+const FLOTILLAS = ['Flota Ancla','Flota Vela','Flota Timón','Flota Faro'];
+const TOTAL_HITOS_POR_DOCENTE = 33; // 18 aprendizaje (2 sin visita doble + 8×2 obs.) + 9 lab (3 talleres × 3 ses.) + 6 clínicas (3 clínicas × 2 ses.)
+let equiposAllVals = [];
 
 function switchProgView(view) {
   document.getElementById('vt-prog-docentes').classList.toggle('active', view==='docentes');
@@ -1543,30 +1613,29 @@ async function renderEquipos() {
   const grid = document.getElementById('equipos-grid');
   if (!grid) return;
   grid.innerHTML = '<div class="loading"><div class="spinner"></div>Cargando...</div>';
-  let allVals = [];
-  try { allVals = await sb('badge_validations?ciclo_escolar=eq.2026-2027&validated=eq.true&programa_id=neq.gamificacion&select=teacher_name,programa_id,hito_n'); } catch(e) {}
+  try { equiposAllVals = await sb('badge_validations?ciclo_escolar=eq.2026-2027&validated=eq.true&programa_id=neq.gamificacion&select=teacher_name,programa_id,hito_n'); } catch(e) { equiposAllVals = []; }
 
-  const stats = COLEGIADOS.map(col => {
-    const miembros = teachers.filter(t => t.active!==false && t.colegiado===col);
+  const stats = FLOTILLAS.map(fl => {
+    const miembros = teachers.filter(t => t.active!==false && t.flotilla===fl);
     const nombres = miembros.map(m=>m.name);
-    const validadas = allVals.filter(v => nombres.includes(v.teacher_name));
+    const validadas = equiposAllVals.filter(v => nombres.includes(v.teacher_name));
     const posible = miembros.length * TOTAL_HITOS_POR_DOCENTE;
     const pct = posible ? Math.min(100, Math.round(validadas.length / posible * 100)) : 0;
     const achieved = new Set(validadas.map(v=>`${v.programa_id}-${v.hito_n}`));
-    return {col, miembros: miembros.length, validadas: validadas.length, posible, pct, achieved};
+    return {fl, miembros: miembros.length, validadas: validadas.length, posible, pct, achieved};
   });
 
   grid.innerHTML = stats.map(s => {
     const r = getTeamRank(s.pct);
     const puedeRetar = s.pct>=35 && s.miembros>0;
-    return `<div class="team-card">
-      <div class="prog-title">${s.col}</div>
+    return `<div class="team-card" style="cursor:pointer" onclick="openFlotillaDetail('${s.fl}')">
+      <div class="prog-title">${s.fl}</div>
       <div class="team-meta">${s.miembros} docente${s.miembros===1?'':'s'} · ${s.validadas}/${s.posible} hitos validados</div>
       <div class="prog-bar-wrap"><div class="prog-bar" style="width:${s.pct}%"></div></div>
       <div class="prog-stats" style="margin-bottom:10px"><div class="prog-stat"><b>${s.pct}%</b><span>avance promedio</span></div></div>
       <span class="rango-pill ${r.cls}">${r.icon} ${r.label}</span>
       ${miniBadgesHTML(s.achieved)}
-      ${puedeRetar?`<div style="margin-top:12px"><button class="btn btn-outline btn-sm" style="width:100%" onclick="openChallengeModal('${s.col}')">🏴 Lanzar reto</button></div>`
+      ${puedeRetar?`<div style="margin-top:12px"><button class="btn btn-outline btn-sm" style="width:100%" onclick="event.stopPropagation();openChallengeModal('${s.fl}')">🏴 Lanzar reto</button></div>`
         :`<div style="font-size:11px;color:var(--ink3);margin-top:12px">Alcanza 35% de avance para lanzar retos</div>`}
     </div>`;
   }).join('');
@@ -1574,8 +1643,38 @@ async function renderEquipos() {
   renderChallengesFeed();
 }
 
+function openFlotillaDetail(fl) {
+  document.getElementById('flotilla-detail-title').textContent = fl;
+  const miembros = teachers.filter(t => t.active!==false && t.flotilla===fl);
+  const body = document.getElementById('flotilla-detail-body');
+  if (!miembros.length) {
+    body.innerHTML = '<div class="empty"><p>Sin docentes asignados a esta flotilla</p></div>';
+    openModal('modal-flotilla');
+    return;
+  }
+  body.innerHTML = miembros.map(m => {
+    const tv = equiposAllVals.filter(v => v.teacher_name === m.name);
+    const cA = hitosCompletadosMultiVisita('aprendizaje', tv.filter(v=>v.programa_id==='aprendizaje').map(v=>v.hito_n)).length;
+    const cL = tv.filter(v=>v.programa_id==='lab').length;
+    const cC = tv.filter(v=>v.programa_id==='clinicas').length;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div class="tc-avatar">${initials(m.name)}</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:500;color:var(--ink)">${m.name}</div>
+        <div style="font-size:11.5px;color:var(--ink3)">Aprendizaje ${cA}/${PROGRAMAS.aprendizaje.hitos.length} · Lab ${cL}/${tallerMetaSesiones('lab')} · Clínicas ${cC}/${tallerMetaSesiones('clinicas')}</div>
+      </div>
+    </div>`;
+  }).join('');
+  openModal('modal-flotilla');
+}
+
 function miniBadgesHTML(achievedSet) {
-  const rowA = PROGRAMAS.aprendizaje.hitos.map(h=>`<span class="mb-dot ${achievedSet.has('aprendizaje-'+h.n)?'on-a':''}" title="${h.nombre}"></span>`).join('');
+  const rowA = PROGRAMAS.aprendizaje.hitos.map(h=>{
+    const req = h.visitas || 1;
+    let completa = true;
+    for (let v=1; v<=req; v++) if (!achievedSet.has('aprendizaje-'+hitoVisitaN(h,v))) { completa=false; break; }
+    return `<span class="mb-dot ${completa?'on-a':''}" title="${h.nombre}"></span>`;
+  }).join('');
   const rowL = PROGRAMAS.lab.hitos.map(h=>
     [1,2,3].map(s=>`<span class="mb-dot ${achievedSet.has('lab-'+tallerHitoDe('lab',h.n,s))?'on-l':''}" title="${h.nombre} · Sesión ${s}"></span>`).join('')).join('');
   const rowC = PROGRAMAS.clinicas.hitos.map(h=>{
@@ -1598,20 +1697,20 @@ async function renderChallengesFeed() {
     <div class="challenge-card">
       <div style="flex:1">
         <div class="challenge-title">${c.title}</div>
-        <div class="challenge-meta">${c.from_colegiado} → ${c.to_colegiado || 'Todos los equipos'} · ${new Date(c.created_at).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}</div>
+        <div class="challenge-meta">${c.from_flotilla} → ${c.to_flotilla || 'Todos los equipos'} · ${new Date(c.created_at).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}</div>
         ${c.description?`<div class="challenge-desc">${c.description}</div>`:''}
       </div>
       <span class="challenge-badge">${c.status==='activo'?'Activo':'Cerrado'}</span>
     </div>`).join('');
 }
 
-function openChallengeModal(fromColegiado) {
-  document.getElementById('challenge-from-label').textContent = `Lanzando reto desde: ${fromColegiado}`;
+function openChallengeModal(fromFlotilla) {
+  document.getElementById('challenge-from-label').textContent = `Lanzando reto desde: ${fromFlotilla}`;
   document.getElementById('ch-target').innerHTML = '<option value="">Todos los equipos</option>'
-    + COLEGIADOS.filter(c=>c!==fromColegiado).map(c=>`<option value="${c}">${c}</option>`).join('');
+    + FLOTILLAS.filter(c=>c!==fromFlotilla).map(c=>`<option value="${c}">${c}</option>`).join('');
   document.getElementById('ch-title').value = '';
   document.getElementById('ch-desc').value = '';
-  document.getElementById('modal-challenge').dataset.from = fromColegiado;
+  document.getElementById('modal-challenge').dataset.from = fromFlotilla;
   openModal('modal-challenge');
 }
 
@@ -1620,8 +1719,8 @@ async function saveChallenge() {
   const title = document.getElementById('ch-title').value.trim();
   if (!title) { notify('Escribe un título para el reto'); return; }
   const payload = {
-    from_colegiado: from,
-    to_colegiado: document.getElementById('ch-target').value || null,
+    from_flotilla: from,
+    to_flotilla: document.getElementById('ch-target').value || null,
     title,
     description: document.getElementById('ch-desc').value.trim(),
     created_by: currentProfile?.name || currentUser?.email || '',
@@ -2352,7 +2451,6 @@ function renderReportes() {
 
 // ---- PROGRAMAS DASHBOARD ----
 const PROG_RPT_COLORS = {aprendizaje:'#F59120', lab:'#2e8b5b', clinicas:'#44579C'};
-const FLOTILLAS = ['Flota Ancla','Flota Vela','Flota Timón','Flota Faro'];
 const MES_NOMBRES = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
 
 function filterBadgeRows() {
@@ -2390,10 +2488,11 @@ function renderRptProg() {
 
   // ---- Lecciones Atractivas: avance por hito ----
   const apr = validadas.filter(b=>b.programa_id==='aprendizaje');
+  const aprHitoDoneSets = PROGRAMAS.aprendizaje.hitos.map(h=>docentesConHitoCompleto(apr, h));
   html += vizCard(`${PROGRAMAS.aprendizaje.title} — docentes con cada hito validado`,
     apr.length
-      ? PROGRAMAS.aprendizaje.hitos.map(h => {
-          const n = new Set(apr.filter(b=>b.hito_n===h.n).map(b=>b.teacher_name)).size;
+      ? PROGRAMAS.aprendizaje.hitos.map((h,i) => {
+          const n = aprHitoDoneSets[i].size;
           return hBar(`${h.n}. ${h.nombre}`, n/totalDocentes*100, PROG_RPT_COLORS.aprendizaje, `${n}/${totalDocentes}`);
         }).join('')
       : '<div style="font-size:12.5px;color:var(--ink3)">Sin hitos validados todavía</div>',
@@ -2404,10 +2503,10 @@ function renderRptProg() {
   const flotillaStats = FLOTILLAS.map(fl => {
     const miembros = teachers.filter(t => t.active!==false && t.flotilla===fl);
     const nombres = miembros.map(m=>m.name);
-    const validasFlotilla = apr.filter(b => nombres.includes(b.teacher_name));
+    const validados = aprHitoDoneSets.reduce((acc,set) => acc + nombres.filter(nm=>set.has(nm)).length, 0);
     const posible = miembros.length * totalHitosApr;
-    const pct = posible ? Math.min(100, Math.round(validasFlotilla.length / posible * 100)) : 0;
-    return {fl, miembros: miembros.length, validados: validasFlotilla.length, posible, pct};
+    const pct = posible ? Math.min(100, Math.round(validados / posible * 100)) : 0;
+    return {fl, miembros: miembros.length, validados, posible, pct};
   });
   const sinFlotilla = teachers.filter(t => t.active!==false && !t.flotilla).length;
   html += vizCard(`${PROGRAMAS.aprendizaje.title} — avance por flotilla`,
