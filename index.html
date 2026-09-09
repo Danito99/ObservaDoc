@@ -677,7 +677,8 @@ textarea.fc{resize:vertical;min-height:70px}
             <h3 id="cd-teacher-name" style="font-family:'Playfair Display',serif;font-size:20px"></h3>
             <p id="cd-ciclo" style="font-size:12px;color:var(--ink3)"></p>
           </div>
-          <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="saveCoachingPlan()">Guardar cambios</button>
+          <button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="downloadCoachingPlanPDF()">📄 Descargar PDF</button>
+          <button class="btn btn-primary btn-sm" onclick="saveCoachingPlan()">Guardar cambios</button>
         </div>
 
         <!-- OBJETIVOS ANUALES -->
@@ -4593,6 +4594,72 @@ async function saveCoachingCycle(n) {
     await patchCoachingCycle(n);
     notify(`Ciclo ${n} guardado ✓`);
   } catch(e) { notify('Error al guardar el ciclo'); }
+}
+
+function downloadCoachingPlanPDF() {
+  if (!currentCoachingPlan) return;
+  const teacherName = document.getElementById('cd-teacher-name').textContent;
+  const cicloEscolar = document.getElementById('cd-ciclo').textContent;
+  const val = id => document.getElementById(id)?.value || '';
+  const field = (lbl, v) => v ? `<div class="box"><div class="box-lbl">${lbl}</div><div class="box-val">${v}</div></div>` : '';
+
+  const objetivos = `
+    <div class="section-header">Objetivos anuales y análisis de habilidades</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      ${field('Rigor académico — Objetivo', val('cd-obj-rigor'))}
+      ${field('Rigor académico — Indicador de éxito', val('cd-ind-rigor'))}
+      ${field('Gestión — Objetivo', val('cd-obj-gestion'))}
+      ${field('Gestión — Indicador de éxito', val('cd-ind-gestion'))}
+      ${field('Planeación — Objetivo', val('cd-obj-planeacion'))}
+      ${field('Planeación — Indicador de éxito', val('cd-ind-planeacion'))}
+      ${field('Habilidades desarrolladas', val('cd-hab-des'))}
+      ${field('Habilidades por desarrollar', val('cd-hab-por'))}
+    </div>`;
+
+  const CICLO_NAMES = ['','PRIMER','SEGUNDO','TERCER','CUARTO'];
+  const CICLO_COLORS = ['','#2B91CF','#F59120','#44579C','#0891b2'];
+  const ciclosHtml = currentCoachingCycles.map(cycle => {
+    const n = cycle.numero_ciclo;
+    const enfoque = val(`cy-enfoque-${n}`);
+    const responsable = val(`cy-responsable-${n}`);
+    const inicio = val(`cy-inicio-${n}`);
+    const cierre = val(`cy-cierre-${n}`);
+    return `<div class="cycle" style="border-left:4px solid ${CICLO_COLORS[n]}">
+      <div class="cycle-title" style="color:${CICLO_COLORS[n]}">${CICLO_NAMES[n]} CICLO DE COACHING</div>
+      <table class="info-table" style="margin-bottom:10px">
+        <tr><td class="lbl">Enfoque:</td><td>${enfoque}</td><td class="lbl">Responsable:</td><td>${responsable}</td></tr>
+        <tr><td class="lbl">Inicio:</td><td>${inicio}</td><td class="lbl">Cierre:</td><td>${cierre}</td></tr>
+      </table>
+      ${field('¿Qué prácticas se implementarán?', val(`cy-practicas-${n}`))}
+      ${field('¿Cómo se monitorea el avance?', val(`cy-monitoreo-${n}`))}
+      ${field('¿Cuáles fueron nuestros pasos previos?', val(`cy-previos-${n}`))}
+      ${field('¿Qué avances notamos conforme al objetivo?', val(`cy-avances-${n}`))}
+      ${field('¿Qué se les dificulta a los estudiantes/maestros?', val(`cy-dificultades-${n}`))}
+      ${field('Metas y compromisos', val(`cy-compromisos-${n}`))}
+      ${field('Notas adicionales', val(`cy-notas-${n}`))}
+    </div>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Plan de Coaching — ${teacherName}</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:13px;color:#414042;padding:24px}
+  .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:3px solid #2B91CF}
+  .header-title h1{font-size:18px;font-weight:bold;color:#414042;margin-bottom:4px}.header-title p{font-size:11px;color:#8e8c8d}
+  table{width:100%;border-collapse:collapse}.info-table td{padding:6px 10px;border:1px solid #d8d4cf;font-size:12px;vertical-align:top}
+  .info-table .lbl{font-weight:bold;background:#f0f0f0;width:110px}
+  .section-header{background:#2B91CF;color:#fff;font-weight:bold;font-size:13px;padding:8px 12px;margin:16px 0 10px}
+  .box{border:1px solid #d8d4cf;border-radius:6px;padding:10px;margin-bottom:8px}.box-lbl{font-weight:bold;font-size:11.5px;margin-bottom:4px;color:#414042}
+  .box-val{font-size:12px;color:#5a5758;line-height:1.5;white-space:pre-wrap}
+  .cycle{padding:14px 0 4px 14px;margin-bottom:10px;page-break-inside:avoid}
+  .cycle-title{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+  .footer{margin-top:20px;padding-top:12px;border-top:2px solid #2B91CF;display:flex;justify-content:space-between;font-size:11px;color:#8e8c8d}
+  @media print{body{padding:12px}@page{margin:1cm}}</style></head><body>
+  <div class="header"><div class="header-title"><h1>Plan de Coaching</h1><p>Christel House México · ${cicloEscolar}</p></div>
+  <div style="font-size:11px;color:#8e8c8d">${teacherName}</div></div>
+  ${objetivos}
+  ${ciclosHtml}
+  <div class="footer"><span>Christel House México · ObservaDoc</span><span>Generado el ${new Date().toLocaleDateString('es-MX')}</span></div>
+  <scr`+`ipt>window.onload=()=>window.print();</scr`+`ipt></body></html>`;
+  openPDFWindow(html);
 }
 
 function closeCoachingDetail() {
