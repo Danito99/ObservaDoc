@@ -4601,7 +4601,26 @@ function downloadCoachingPlanPDF() {
   const teacherName = document.getElementById('cd-teacher-name').textContent;
   const cicloEscolar = document.getElementById('cd-ciclo').textContent;
   const val = id => document.getElementById(id)?.value || '';
-  const field = (lbl, v) => v ? `<div class="box"><div class="box-lbl">${lbl}</div><div class="box-val">${v}</div></div>` : '';
+  const field = (lbl, v) => `<div class="box"><div class="box-lbl">${lbl}</div><div class="box-val">${v || '<span style=\'color:#b6b3ae\'>Sin registrar</span>'}</div></div>`;
+  const printActionsTable = (accs, sesionesGrupales) => {
+    const tipos = [
+      { key: 'FO', label: 'Observaciones formales', auto: true },
+      { key: 'LW', label: 'Learning walk', auto: true },
+      { key: 'FB', label: 'Sesión de feedback', auto: true },
+      { key: 'MC', label: 'Modelaje de estrategias', auto: true },
+      { key: 'grupal', label: 'Sesión grupal / Clínica', auto: false },
+    ];
+    const maxCols = 10;
+    return `<table class="tbl-actions"><thead><tr><th style="text-align:left">Estrategia</th>
+      ${Array.from({length:maxCols},(_,i)=>`<th>${i+1}</th>`).join('')}<th>Total</th></tr></thead><tbody>
+      ${tipos.map(t => {
+        const count = t.auto ? (accs[t.key] || 0) : (sesionesGrupales || 0);
+        return `<tr><td style="text-align:left">${t.label}${t.auto ? ' <span style="font-size:9px;color:#8e8c8d">(automático)</span>' : ''}</td>
+        ${Array.from({length:maxCols},(_,i)=>`<td>${i<count?'✔':''}</td>`).join('')}
+        <td style="font-weight:bold">${count}</td></tr>`;
+      }).join('')}
+      </tbody></table>`;
+  };
 
   const objetivos = `
     <div class="section-header">Objetivos anuales y análisis de habilidades</div>
@@ -4624,6 +4643,7 @@ function downloadCoachingPlanPDF() {
     const responsable = val(`cy-responsable-${n}`);
     const inicio = val(`cy-inicio-${n}`);
     const cierre = val(`cy-cierre-${n}`);
+    const accs = computeCycleActions(teacherName, responsable, inicio, cierre);
     return `<div class="cycle" style="border-left:4px solid ${CICLO_COLORS[n]}">
       <div class="cycle-title" style="color:${CICLO_COLORS[n]}">${CICLO_NAMES[n]} CICLO DE COACHING</div>
       <table class="info-table" style="margin-bottom:10px">
@@ -4632,11 +4652,14 @@ function downloadCoachingPlanPDF() {
       </table>
       ${field('¿Qué prácticas se implementarán?', val(`cy-practicas-${n}`))}
       ${field('¿Cómo se monitorea el avance?', val(`cy-monitoreo-${n}`))}
+      <div class="sub-header">Reflexión del ciclo</div>
       ${field('¿Cuáles fueron nuestros pasos previos?', val(`cy-previos-${n}`))}
       ${field('¿Qué avances notamos conforme al objetivo?', val(`cy-avances-${n}`))}
       ${field('¿Qué se les dificulta a los estudiantes/maestros?', val(`cy-dificultades-${n}`))}
       ${field('Metas y compromisos', val(`cy-compromisos-${n}`))}
       ${field('Notas adicionales', val(`cy-notas-${n}`))}
+      <div class="sub-header">Acciones del ciclo</div>
+      ${printActionsTable(accs, cycle.sesiones_grupales)}
     </div>`;
   }).join('');
 
@@ -4651,6 +4674,9 @@ function downloadCoachingPlanPDF() {
   .box-val{font-size:12px;color:#5a5758;line-height:1.5;white-space:pre-wrap}
   .cycle{padding:14px 0 4px 14px;margin-bottom:10px;page-break-inside:avoid}
   .cycle-title{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+  .sub-header{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#8e8c8d;margin:10px 0 6px}
+  .tbl-actions{width:100%;border-collapse:collapse;font-size:10px;margin-bottom:8px}
+  .tbl-actions th,.tbl-actions td{border:1px solid #d8d4cf;padding:4px;text-align:center}
   .footer{margin-top:20px;padding-top:12px;border-top:2px solid #2B91CF;display:flex;justify-content:space-between;font-size:11px;color:#8e8c8d}
   @media print{body{padding:12px}@page{margin:1cm}}</style></head><body>
   <div class="header"><div class="header-title"><h1>Plan de Coaching</h1><p>Christel House México · ${cicloEscolar}</p></div>
