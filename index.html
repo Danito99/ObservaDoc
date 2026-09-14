@@ -160,9 +160,11 @@ textarea.fc{resize:vertical;min-height:70px}
 .cal-nav-btn:hover{background:var(--paper)}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr)}
 .cal-dh{padding:9px;text-align:center;font-size:11px;font-weight:500;color:var(--ink3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)}
-.cal-day{min-height:90px;padding:6px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
+.cal-day{min-height:90px;padding:6px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);cursor:pointer}
+.cal-day:hover{background:#fafafa}
 .cal-day:nth-child(7n){border-right:none}
-.cal-day.other{background:var(--paper)}
+.cal-day.other{background:var(--paper);cursor:default}
+.cal-day.other:hover{background:var(--paper)}
 .cal-day.today{background:#fef3e2}
 .cal-dnum{font-size:12px;font-weight:500;color:var(--ink3);width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%;margin-bottom:3px}
 .cal-day.today .cal-dnum{background:var(--ch-orange);color:#fff}
@@ -1896,9 +1898,9 @@ function renderCalendar(containerId, year, month, acts, onPrev, onNext) {
     const isToday=today.getFullYear()===year&&today.getMonth()===month&&today.getDate()===d;
     const da=byDate[ds]||[];
     const show=da.slice(0,3);const more=da.length-show.length;
-    html+=`<div class="cal-day${isToday?' today':''}"><div class="cal-dnum">${d}</div>
-      ${show.map(a=>`<div class="cal-ev ${TYPE_COLORS[a.type]}" onclick="showDetail('${a.id}')" title="${a.teacher_name}">${a.type}·${shortName(a.teacher_name)}</div>`).join('')}
-      ${more>0?`<div class="cal-more">+${more} más</div>`:''}</div>`;
+    html+=`<div class="cal-day${isToday?' today':''}" onclick="openNewForDate('${ds}')"><div class="cal-dnum">${d}</div>
+      ${show.map(a=>`<div class="cal-ev ${TYPE_COLORS[a.type]}" onclick="event.stopPropagation();showDetail('${a.id}')" title="${a.teacher_name}">${a.type}·${shortName(a.teacher_name)}</div>`).join('')}
+      ${more>0?`<div class="cal-more" onclick="event.stopPropagation()">+${more} más</div>`:''}</div>`;
   }
   const rem=(firstDay+daysInMonth)%7===0?0:7-(firstDay+daysInMonth)%7;
   for(let i=1;i<=rem;i++)html+=`<div class="cal-day other"><div class="cal-dnum">${i}</div></div>`;
@@ -2109,6 +2111,19 @@ function openNew(){
   document.getElementById('m-status').value='pending';document.getElementById('m-type').value='LW';
   document.getElementById('m-teacher').innerHTML=teachers.map(t=>`<option value="${t.id}|${t.name}">${t.name}</option>`).join('');
   // Pre-select current user as leader
+  document.getElementById('m-leader').innerHTML=leaders.map(l=>`<option value="${l.id}|${l.name}"${currentProfile&&l.name===currentProfile.leader_name?' selected':''}>${l.name}</option>`).join('');
+  openModal('modal-act');
+}
+
+// Abre el modal de nueva actividad prellenado con la fecha del día en que se hizo clic en el calendario.
+function openNewForDate(dateStr){
+  document.getElementById('edit-id').value='';
+  document.getElementById('modal-title').textContent='Nueva actividad';
+  document.getElementById('m-date').value=dateStr;
+  document.getElementById('m-notes').value='';document.getElementById('m-evidence').value='';
+  document.getElementById('m-start-time').value='';document.getElementById('m-end-time').value='';
+  document.getElementById('m-status').value='pending';document.getElementById('m-type').value='LW';
+  document.getElementById('m-teacher').innerHTML=teachers.map(t=>`<option value="${t.id}|${t.name}">${t.name}</option>`).join('');
   document.getElementById('m-leader').innerHTML=leaders.map(l=>`<option value="${l.id}|${l.name}"${currentProfile&&l.name===currentProfile.leader_name?' selected':''}>${l.name}</option>`).join('');
   openModal('modal-act');
 }
