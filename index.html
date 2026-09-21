@@ -1767,7 +1767,9 @@ function initials(name){if(!name)return'?';const p=name.trim().split(/\s+/).filt
 function shortName(name){if(!name)return'';const p=name.trim().split(' ');return p[0]+(p[1]?' '+p[1]:'');}
 function monthFromDate(d){if(!d)return'';const m=parseInt(d.split('-')[1]);const map={9:'SEPTIEMBRE',10:'OCTUBRE',11:'NOVIEMBRE',12:'DICIEMBRE',1:'ENERO',2:'FEBRERO',3:'MARZO',4:'ABRIL',5:'MAYO',6:'JUNIO'};return map[m]||'';}
 function formatDate(d){if(!d)return'—';const[y,m,dd]=d.split('-');return`${dd}/${m}/${y}`;}
-function isOwn(a){return currentProfile && (currentProfile.rol==='admin' || a.leader_name===currentProfile.leader_name);}
+function leaderInvolved(row, name){ return !!name && (row.leader_name===name || (row.co_leader_names||[]).includes(name)); }
+function coLeaderSuffix(row){ return (row.co_leader_names&&row.co_leader_names.length) ? ` + ${row.co_leader_names.join(', ')}` : ''; }
+function isOwn(a){return currentProfile && (currentProfile.rol==='admin' || leaderInvolved(a, currentProfile.leader_name));}
 
 function updateBadges() {
   document.getElementById('nb-pend').textContent = activities.filter(a=>a.status!=='done').length;
@@ -1795,9 +1797,9 @@ function renderDashboard() {
     </div>`;
   }).join('');
 
-  const maxL=Math.max(...leaders.map(l=>activities.filter(a=>a.leader_name===l.name).length),1);
+  const maxL=Math.max(...leaders.map(l=>activities.filter(a=>leaderInvolved(a,l.name)).length),1);
   document.getElementById('dash-lideres').innerHTML=leaders.map(l=>{
-    const cnt=activities.filter(a=>a.leader_name===l.name).length;
+    const cnt=activities.filter(a=>leaderInvolved(a,l.name)).length;
     if(!cnt)return'';
     return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
       <span style="font-size:12.5px;color:var(--ink2);min-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${shortName(l.name)}</span>
@@ -1816,7 +1818,7 @@ function renderDashboard() {
     <tbody>${upcoming.map(a=>`<tr>
       <td><div style="display:flex;align-items:center;gap:7px"><span class="avatar">${initials(a.teacher_name)}</span>${shortName(a.teacher_name)}</div></td>
       <td>${typeBadge(a.type)}</td>
-      <td style="font-size:12.5px">${a.leader_name||'—'}${isOwn(a)?'<span class="own-badge">mía</span>':''}</td>
+      <td style="font-size:12.5px">${a.leader_name||'—'}${coLeaderSuffix(a)}${isOwn(a)?'<span class="own-badge">mía</span>':''}</td>
       <td style="font-size:12.5px">${formatDate(a.date)}</td>
       <td>${statusBadge(a.status)}</td>
       <td><div class="action-row">
@@ -1837,7 +1839,7 @@ function getFiltered() {
   return activities.filter(a=>{
     if(search&&!(a.teacher_name||'').toLowerCase().includes(search)&&!(a.leader_name||'').toLowerCase().includes(search))return false;
     if(tipo&&a.type!==tipo)return false;
-    if(lider&&a.leader_name!==lider)return false;
+    if(lider&&!leaderInvolved(a,lider))return false;
     if(mes&&a.month!==mes)return false;
     if(status&&a.status!==status)return false;
     return true;
@@ -1854,7 +1856,7 @@ function renderTable() {
     <tbody>${filtered.map(a=>`<tr class="${a.status==='done'?'done-row':''}">
       <td><div style="display:flex;align-items:center;gap:7px"><span class="avatar">${initials(a.teacher_name)}</span><span style="font-size:12.5px">${shortName(a.teacher_name)}</span></div></td>
       <td>${typeBadge(a.type)}</td>
-      <td style="font-size:12.5px">${a.leader_name||'—'}${isOwn(a)?'<span class="own-badge">mía</span>':''}</td>
+      <td style="font-size:12.5px">${a.leader_name||'—'}${coLeaderSuffix(a)}${isOwn(a)?'<span class="own-badge">mía</span>':''}</td>
       <td style="font-size:12.5px">${formatDate(a.date)}</td>
       <td style="font-size:12px;color:var(--ink3)">${cap(a.month||'')}</td>
       <td>${statusBadge(a.status)}</td>
@@ -1914,7 +1916,7 @@ function renderActCal(){renderCalendar('act-cal',calYear,calMonth,getFiltered(),
 // MY CALENDAR
 function renderMyCalendar() {
   const today=new Date().toISOString().split('T')[0];
-  const myActs=activities.filter(a=>a.leader_name===currentProfile.leader_name&&a.status!=='done'&&a.date>=today).sort((a,b)=>a.date.localeCompare(b.date));
+  const myActs=activities.filter(a=>leaderInvolved(a,currentProfile.leader_name)&&a.status!=='done'&&a.date>=today).sort((a,b)=>a.date.localeCompare(b.date));
   document.getElementById('my-upcoming').innerHTML=myActs.length?`<table class="tbl">
     <thead><tr><th>Docente</th><th>Tipo</th><th>Fecha</th><th>Estado</th><th></th></tr></thead>
     <tbody>${myActs.map(a=>`<tr>
@@ -2011,7 +2013,7 @@ function renderLideres(){
   const acts=mes?activities.filter(a=>a.month===mes):activities;
   document.getElementById('lideres-content').innerHTML=`
     <div class="leader-grid">${leaders.map(l=>{
-      const la=acts.filter(a=>a.leader_name===l.name);
+      const la=acts.filter(a=>leaderInvolved(a,l.name));
       return`<div class="leader-card">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
           <div class="avatar">${initials(l.name)}</div>
@@ -2026,7 +2028,7 @@ function renderLideres(){
     <div class="card"><table class="tbl">
       <thead><tr><th>Líder</th><th>LW</th><th>Obs. Formal</th><th>Feedback</th><th>Modeling</th><th>Total</th></tr></thead>
       <tbody>${leaders.map(l=>{
-        const la=acts.filter(a=>a.leader_name===l.name);
+        const la=acts.filter(a=>leaderInvolved(a,l.name));
         const t=tipo=>la.filter(a=>a.type===tipo).length;
         return`<tr><td><div style="display:flex;align-items:center;gap:7px"><div class="avatar">${initials(l.name)}</div>${l.name}</div></td>
           <td><span class="badge b-lw">${t('LW')}</span></td>
@@ -2201,7 +2203,7 @@ function showDetail(id){
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
       <div class="avatar" style="width:42px;height:42px;font-size:15px">${initials(a.teacher_name)}</div>
       <div><div style="font-weight:500;font-size:15px">${a.teacher_name}</div>
-        <div style="font-size:12.5px;color:var(--ink3)">${a.leader_name||''}${own?'<span class="own-badge" style="margin-left:6px">registrada por ti</span>':''}</div>
+        <div style="font-size:12.5px;color:var(--ink3)">${a.leader_name||''}${coLeaderSuffix(a)}${own?'<span class="own-badge" style="margin-left:6px">registrada por ti</span>':''}</div>
       </div>
       <div style="margin-left:auto">${typeBadge(a.type)}</div>
     </div>
@@ -2332,7 +2334,7 @@ function filterRptData(data, tipo) {
   const f = getRptFilters();
   return data.filter(d => {
     if (f.docente && d.teacher_name !== f.docente) return false;
-    if (f.lider && d.leader_name !== f.lider) return false;
+    if (f.lider && !leaderInvolved(d, f.lider)) return false;
     if (f.nivel && d.nivel !== f.nivel) return false;
     if (f.mes) {
       const act = activities.find(a => a.id === d.activity_id);
@@ -2607,7 +2609,7 @@ function renderRptOverview() {
   const f = getRptFilters();
   let acts = activities.filter(a => a.status === 'done');
   if(f.docente) acts = acts.filter(a=>a.teacher_name===f.docente);
-  if(f.lider) acts = acts.filter(a=>a.leader_name===f.lider);
+  if(f.lider) acts = acts.filter(a=>leaderInvolved(a,f.lider));
   if(f.mes) acts = acts.filter(a=>a.month===f.mes);
 
   const byType = {LW:0,FO:0,FB:0,MC:0};
@@ -3726,10 +3728,31 @@ function getEstrategiasChecked(name) {
   return [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(i=>i.value);
 }
 
+// ---- CO-LÍDER ACOMPAÑANTE ----
+// Permite acreditar la observación a más de un líder sin crear una segunda actividad/formulario
+// (el docente sigue contando como observado una sola vez; el co-líder queda con los mismos permisos sobre esta actividad).
+function coLeaderPickerHTML(selectedNames=[]) {
+  const options = leaders.filter(l=>l.name!==currentProfile?.leader_name && l.active!==false);
+  if (!options.length) return '';
+  return `<div style="margin-bottom:14px;padding:10px 12px;background:var(--paper2);border-radius:var(--r-sm)">
+    <label style="font-size:12px;font-weight:500;color:var(--ink3);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px">¿Te acompaña otro líder en esta observación?</label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px 16px">
+      ${options.map(l=>`<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12.5px;color:var(--ink)">
+        <input type="checkbox" class="co-leader-check" value="${l.id}|${l.name}" ${selectedNames.includes(l.name)?'checked':''} style="width:15px;height:15px;accent-color:var(--teal)">${l.name}
+      </label>`).join('')}
+    </div>
+  </div>`;
+}
+function getSelectedCoLeaders() {
+  return [...document.querySelectorAll('.co-leader-check:checked')].map(el=>{
+    const [id,name]=el.value.split('|'); return {id,name};
+  });
+}
+
 // ---- FO FORM ----
 let foStep = 1, foSelectedDomain = null, foSelectedAspecto = null, foIndicators = [], foPrefix = 'fo';
 let foRespuestas = {}, foNotas = {};
-let foDatosGenerales = {};
+let foDatosGenerales = {}, foCoLeaders = [];
 
 // Batería extra de Innovación y Tecnología: visible en todos los dominios, solo para este perfil
 const FO_TECH_EMAIL = 'despinosa@mx.christelhouse.org';
@@ -3765,7 +3788,7 @@ function getFOAspectos(dom) {
 }
 
 function buildFormFO(a) {
-  foStep = 1; foSelectedDomain = null; foSelectedAspecto = null; foRespuestas = {}; foNotas = {}; foDatosGenerales = {};
+  foStep = 1; foSelectedDomain = null; foSelectedAspecto = null; foRespuestas = {}; foNotas = {}; foDatosGenerales = {}; foCoLeaders = [];
   renderFOStep(a);
 }
 
@@ -3783,6 +3806,7 @@ function renderFOStep(a) {
         <div><label style="font-size:12px;font-weight:500;color:var(--ink3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Líder</label>
           <input class="fc" id="fo-lider" value="${currentProfile?.leader_name||''}" readonly style="background:var(--paper)"></div>
       </div>
+      ${coLeaderPickerHTML(foCoLeaders.map(c=>c.name))}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div><label style="font-size:12px;font-weight:500;color:var(--ink3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Nivel *</label>
           <select class="fc" id="fo-nivel" onchange="foUpdateGrupos()">
@@ -3964,6 +3988,7 @@ function foNext() {
       parte_clase: document.getElementById('fo-parte')?.value,
       fecha: document.getElementById('fo-fecha')?.value
     };
+    foCoLeaders = getSelectedCoLeaders();
     foStep = 2;
   } else if (foStep===2) {
     if (!foSelectedDomain) { notify('Elige un dominio para continuar'); return; }
@@ -3990,10 +4015,12 @@ async function submitFO() {
   const btn = document.getElementById('fo-submit-btn');
   btn.textContent = 'Guardando...'; btn.disabled = true;
   try {
+    const co_leader_ids = foCoLeaders.map(c=>c.id), co_leader_names = foCoLeaders.map(c=>c.name);
     await sb('form_fo', {method:'POST', body: JSON.stringify({
       activity_id: currentFormActivity.id,
       leader_name: currentProfile?.leader_name,
       teacher_name: currentFormActivity.teacher_name,
+      co_leader_ids, co_leader_names,
       nivel: foDatosGenerales.nivel,
       grupo: foDatosGenerales.grupo,
       materia: foDatosGenerales.materia,
@@ -4009,7 +4036,7 @@ async function submitFO() {
       valoracion_general: valoracionEl ? parseInt(valoracionEl.value) : null,
       estrategias: getEstrategiasChecked('fo_estrategias')
     })});
-    await sb(`activities?id=eq.${currentFormActivity.id}`, {method:'PATCH', body: JSON.stringify({status:'done'})});
+    await sb(`activities?id=eq.${currentFormActivity.id}`, {method:'PATCH', body: JSON.stringify({status:'done', co_leader_ids, co_leader_names})});
     await loadActivities();
     closeModal('modal-form');
     notify('Observación guardada y sesión completada ✓');
@@ -4039,6 +4066,7 @@ function buildFormLW(a) {
             ${['Inicio','Desarrollo','Cierre'].map(p=>`<option>${p}</option>`).join('')}
           </select></div>
       </div>
+      ${coLeaderPickerHTML()}
 
       <div style="font-size:12px;font-weight:500;color:var(--ink);background:var(--paper2);padding:7px 10px;border-radius:var(--r-sm);margin-bottom:10px">Lo que observé</div>
       ${preguntas.map((p, i) => `
@@ -4097,10 +4125,13 @@ async function submitLW() {
   }
   const apertura = document.querySelector('input[name="lw_apertura"]:checked')?.value || '';
   try {
+    const coLeaders = getSelectedCoLeaders();
+    const co_leader_ids = coLeaders.map(c=>c.id), co_leader_names = coLeaders.map(c=>c.name);
     await sb('form_lw', {method:'POST', body: JSON.stringify({
       activity_id: currentFormActivity.id,
       leader_name: currentProfile?.leader_name,
       teacher_name: currentFormActivity.teacher_name,
+      co_leader_ids, co_leader_names,
       fecha: currentFormActivity.date,
       parte_clase: document.getElementById('lw-parte')?.value,
       observaciones,
@@ -4109,7 +4140,7 @@ async function submitLW() {
       apertura_docente: apertura,
       estrategias: getEstrategiasChecked('lw_estrategias')
     })});
-    await sb(`activities?id=eq.${currentFormActivity.id}`,{method:'PATCH',body:JSON.stringify({status:'done'})});
+    await sb(`activities?id=eq.${currentFormActivity.id}`,{method:'PATCH',body:JSON.stringify({status:'done', co_leader_ids, co_leader_names})});
     await loadActivities();
     closeModal('modal-form');
     notify('Learning Walk guardado y sesión completada ✓');
@@ -4135,6 +4166,7 @@ async function buildFormMC(a) {
         <div><label style="font-size:12px;font-weight:500;color:var(--ink3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Fecha</label>
           <input class="fc" value="${formatDate(a.date)}" readonly style="background:var(--paper)"></div>
       </div>
+      ${coLeaderPickerHTML(draft?.co_leader_names||[])}
 
       <div style="font-size:12px;font-weight:500;color:var(--ink);background:#eef0f8;color:#344080;padding:7px 10px;border-radius:var(--r-sm);margin-bottom:10px">Antes — Acuerdo con el docente</div>
       ${[
@@ -4203,10 +4235,13 @@ async function submitMC(markDone = false) {
   try {
     // Verificar si ya existe un registro para esta actividad
     const existing = await sb(`form_mc?activity_id=eq.${currentFormActivity.id}&limit=1`);
+    const coLeaders = getSelectedCoLeaders();
+    const co_leader_ids = coLeaders.map(c=>c.id), co_leader_names = coLeaders.map(c=>c.name);
     const payload = {
       activity_id:currentFormActivity.id,
       leader_name:currentProfile?.leader_name,
       teacher_name:currentFormActivity.teacher_name,
+      co_leader_ids, co_leader_names,
       fecha:currentFormActivity.date,
       objetivo_docente:document.getElementById('mc-objetivo')?.value,
       dificultad_docente:dificultad,
@@ -4224,7 +4259,7 @@ async function submitMC(markDone = false) {
       await sb('form_mc',{method:'POST',body:JSON.stringify(payload)});
     }
     if(markDone) {
-      await sb(`activities?id=eq.${currentFormActivity.id}`,{method:'PATCH',body:JSON.stringify({status:'done'})});
+      await sb(`activities?id=eq.${currentFormActivity.id}`,{method:'PATCH',body:JSON.stringify({status:'done', co_leader_ids, co_leader_names})});
       await loadActivities();
       const teacherName = currentFormActivity.teacher_name, leaderName = currentProfile?.leader_name;
       closeModal('modal-form');
@@ -4232,6 +4267,8 @@ async function submitMC(markDone = false) {
       renderCurrentPage();
       if(payload.fecha_seguimiento) openFollowUpModal(teacherName, leaderName, payload.fecha_seguimiento);
     } else {
+      await sb(`activities?id=eq.${currentFormActivity.id}`,{method:'PATCH',body:JSON.stringify({co_leader_ids, co_leader_names})});
+      await loadActivities();
       notify('Borrador guardado — puedes seguir llenando más tarde ✓');
       renderCurrentPage();
     }
@@ -4246,6 +4283,7 @@ function buildFormFB(a) {
       <div style="margin-bottom:6px;padding:10px 14px;background:var(--teal-bg);border-radius:var(--r-sm)">
         <div style="font-size:12px;color:var(--teal-text);font-weight:500">Sesión de Feedback con ${a.teacher_name}</div>
       </div>
+      ${coLeaderPickerHTML()}
       <div style="margin-top:14px">
         <div style="font-size:12px;font-weight:500;color:var(--ink);background:var(--paper2);padding:7px 10px;border-radius:var(--r-sm);margin-bottom:10px">Reflexión del docente</div>
         ${[
@@ -4316,10 +4354,13 @@ async function submitFB() {
   const btn = document.getElementById('fb-submit-btn');
   btn.textContent='Guardando...'; btn.disabled=true;
   try {
+    const coLeaders = getSelectedCoLeaders();
+    const co_leader_ids = coLeaders.map(c=>c.id), co_leader_names = coLeaders.map(c=>c.name);
     await sb('form_fb',{method:'POST',body:JSON.stringify({
       activity_id:currentFormActivity.id,
       leader_name:currentProfile?.leader_name,
       teacher_name:currentFormActivity.teacher_name,
+      co_leader_ids, co_leader_names,
       fecha:currentFormActivity.date,
       momento_exitoso:document.getElementById('fb-q1')?.value,
       algo_no_salio:document.getElementById('fb-q2')?.value,
@@ -4333,7 +4374,7 @@ async function submitFB() {
       disposicion_docente:document.querySelector('input[name="fb_disposicion"]:checked')?.value||null,
       relacionado_fo:document.getElementById('fb-relacionado')?.checked||false
     })});
-    await sb(`activities?id=eq.${currentFormActivity.id}`,{method:'PATCH',body:JSON.stringify({status:'done'})});
+    await sb(`activities?id=eq.${currentFormActivity.id}`,{method:'PATCH',body:JSON.stringify({status:'done', co_leader_ids, co_leader_names})});
     await loadActivities();
     const teacherName = currentFormActivity.teacher_name, leaderName = currentProfile?.leader_name;
     closeModal('modal-form');
@@ -4491,7 +4532,7 @@ function computeCycleActions(teacherName, responsable, fechaInicio, fechaCierre)
   if (!responsable || !fechaInicio || !fechaCierre) return { FO: 0, LW: 0, FB: 0, MC: 0, grupal: 0 };
   const acts = activities.filter(a =>
     a.teacher_name === teacherName &&
-    a.leader_name === responsable &&
+    leaderInvolved(a, responsable) &&
     a.status === 'done' &&
     a.date >= fechaInicio &&
     a.date <= fechaCierre
