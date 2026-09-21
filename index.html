@@ -1214,7 +1214,7 @@ const HITO_CRITERIA = {
     1: ['Asistió a la sesión de lanzamiento del programa','Comprende el propósito del plan anual y las técnicas a trabajar','Puede explicar qué se espera del docente durante el ciclo'],
     2: ['Los alumnos trabajan cognitivamente al menos 30% del tiempo (pensar, escribir, analizar)','El 100% de los alumnos participa y produce evidencia de aprendizaje','Las actividades demandan pensamiento de alto nivel (aplicar, analizar, evaluar o crear)','El aprendizaje conecta con contextos reales o conocimientos previos del alumno'],
     3: ['La clase inicia con un elemento que captura el interés en los primeros minutos','El enganche conecta con contextos reales o relevantes para el alumno','Los alumnos muestran curiosidad o participación activa desde el inicio de la clase'],
-    4: ['La energía del salón es alta y enfocada durante la actividad principal','Los alumnos participan con entusiasmo genuino, no solo por obligación','El docente mantiene un ritmo dinámico sin perder el foco académico'],
+    4: ['Juegos y desafíos: la clase incluye un juego, reto o competencia amistosa que motiva la participación','Pertenencia: hay un momento que refuerza el sentido de comunidad o identidad del grupo','Dramatización, canto y baile: se usa actuación, canto o baile como parte de la actividad','Humor: el docente usa el humor de forma genuina para conectar con el grupo','Suspenso y sorpresa: hay un elemento de misterio o sorpresa que capta la atención','Cambiar los ritmos de la sesión: el docente varía el ritmo (acelera, pausa, cambia de formato o energía)'],
     5: ['El docente presenta el proyecto con un gancho que genera curiosidad e interés','Los alumnos comprenden la pregunta o reto central del proyecto','La pregunta o reto conecta con un contexto real o significativo','Los alumnos muestran motivación visible para iniciar el proyecto'],
     6: ['Los alumnos tienen una hoja de ruta clara (etapas, responsables, tiempos)','Los roles del equipo están definidos y son comprensibles para todos','El plan se alinea con los objetivos de aprendizaje de la unidad','Los alumnos pueden explicar su plan de trabajo'],
     7: ['Los alumnos investigan y producen contenido de forma activa y autónoma','El docente acompaña y guía sin sustituir el trabajo del alumno','Hay evidencia visible del proceso de creación (borradores, esquemas, productos parciales)','Las fuentes y recursos de investigación son pertinentes y variados'],
@@ -1242,6 +1242,14 @@ PROGRAMAS.clinicas.hitos.forEach(h => {
   HITO_CRITERIA.clinicas[h.n] = CLINICA_S1_CRITERIA;
   HITO_CRITERIA.clinicas[tallerHitoDe('clinicas', h.n, 2)] = CLINICA_S2_CRITERIA;
 });
+
+// Hitos donde no se exige marcar TODOS los criterios, sino un mínimo (p.ej. Joy Factor:
+// basta con integrar alguno de los elementos, no los seis en la misma clase).
+const HITO_MIN_CHECKED = { aprendizaje: { 4: 1 } };
+function criteriaMet(progId, baseN, checked) {
+  const min = HITO_MIN_CHECKED[progId]?.[baseN];
+  return min != null ? checked.filter(Boolean).length >= min : checked.every(Boolean);
+}
 
 // Hitos que requieren 2 observaciones (p.ej. aprendizaje 2–9): cada observación se guarda
 // como un registro aparte en badge_validations, con hito_n = n + (observación−1)×100.
@@ -1532,6 +1540,7 @@ function openHitoModal(progId, hitoN, teacherName) {
   document.getElementById('hito-modal-body').innerHTML = `
     <div style="font-size:12px;color:var(--ink3);margin-bottom:16px">${cfg?cfg.sesiones[sesion]+' — '+hito.nombre:hito.desc} · <b>${teacherName}</b></div>
     ${visitaN?`<div style="font-size:11.5px;color:var(--ch-orange);margin-bottom:14px;font-weight:500">Este hito requiere 2 observaciones en clases distintas. Esta es la observación ${visitaN} de ${hito.visitas}.</div>`:''}
+    ${HITO_MIN_CHECKED[progId]?.[cfg?hitoN:baseN]!=null?`<div style="font-size:11.5px;color:var(--ch-orange);margin-bottom:14px;font-weight:500">Marca los elementos que integró el docente — basta con al menos ${HITO_MIN_CHECKED[progId][cfg?hitoN:baseN]} para validar.</div>`:''}
     <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);margin-bottom:10px">Criterios observables</div>
     ${criteria.map((c,i)=>`<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;color:var(--ink);line-height:1.4">
       <input type="checkbox" id="hc-${i}" style="margin-top:2px;width:15px;height:15px;accent-color:var(--ch-orange);flex-shrink:0" ${checked[i]?'checked':''}>${c}</label>`).join('')}
@@ -1562,7 +1571,7 @@ async function saveHitoValidation() {
   const plan = conPlan ? (document.getElementById('hito-plan')?.value || '').trim() : null;
   const fechasImpl = conFechas ? [...document.querySelectorAll('.hito-fecha')].map(i=>i.value).filter(Boolean) : null;
   const tiposObs = conTipo ? [...document.querySelectorAll('input[name="hito-obs-tipo"]:checked')].map(i=>i.value) : null;
-  const allChecked = criteriaChecked.every(Boolean)
+  const allChecked = criteriaMet(progId, cfg ? hitoN : baseN, criteriaChecked)
     && (!conPlan || !!plan) && (!conFechas || fechasImpl.length>0) && (!conTipo || tiposObs.length>0);
   const payload = {teacher_name:teacherName, programa_id:progId, hito_n:hitoN, criteria_checked:criteriaChecked,
     validated:allChecked, validated_by:currentProfile?.name||currentUser?.email||'',
@@ -1583,7 +1592,7 @@ async function saveHitoValidation() {
     }
     closeModal('modal-hito');
     const nombre = cfg ? `${tallerDe(progId, hitoN).nombre} · Sesión ${sesion}` : PROGRAMAS[progId].hitos.find(h=>h.n===baseN).nombre;
-    notify(allChecked ? `✓ Validado: ${nombre}` : (criteriaChecked.every(Boolean) && (conPlan||conFechas||conTipo) ? 'Guardado — faltan datos de la sesión para validar' : 'Progreso guardado'));
+    notify(allChecked ? `✓ Validado: ${nombre}` : (criteriaMet(progId, cfg ? hitoN : baseN, criteriaChecked) && (conPlan||conFechas||conTipo) ? 'Guardado — faltan datos de la sesión para validar' : 'Progreso guardado'));
     renderProgCards();
   } catch(e) {
     notify('Error al guardar. Verifica tu conexión.');
