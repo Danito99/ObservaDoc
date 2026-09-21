@@ -828,6 +828,7 @@ textarea.fc{resize:vertical;min-height:70px}
           <select class="fc" id="m-leader"></select>
         </div>
       </div>
+      <div class="fg" id="m-coleaders-wrap"></div>
       <div class="frow">
         <div class="fg">
           <label class="flbl">Tipo <span>*</span></label>
@@ -2114,6 +2115,7 @@ function openNew(){
   document.getElementById('m-teacher').innerHTML=teachers.map(t=>`<option value="${t.id}|${t.name}">${t.name}</option>`).join('');
   // Pre-select current user as leader
   document.getElementById('m-leader').innerHTML=leaders.map(l=>`<option value="${l.id}|${l.name}"${currentProfile&&l.name===currentProfile.leader_name?' selected':''}>${l.name}</option>`).join('');
+  document.getElementById('m-coleaders-wrap').innerHTML=coLeaderPickerHTML();
   openModal('modal-act');
 }
 
@@ -2127,6 +2129,7 @@ function openNewForDate(dateStr){
   document.getElementById('m-status').value='pending';document.getElementById('m-type').value='LW';
   document.getElementById('m-teacher').innerHTML=teachers.map(t=>`<option value="${t.id}|${t.name}">${t.name}</option>`).join('');
   document.getElementById('m-leader').innerHTML=leaders.map(l=>`<option value="${l.id}|${l.name}"${currentProfile&&l.name===currentProfile.leader_name?' selected':''}>${l.name}</option>`).join('');
+  document.getElementById('m-coleaders-wrap').innerHTML=coLeaderPickerHTML();
   openModal('modal-act');
 }
 
@@ -2141,6 +2144,7 @@ function openFollowUpModal(teacherName, leaderName, date){
   document.getElementById('m-status').value='pending';document.getElementById('m-type').value='LW';
   document.getElementById('m-teacher').innerHTML=teachers.map(t=>`<option value="${t.id}|${t.name}"${t.name===teacherName?' selected':''}>${t.name}</option>`).join('');
   document.getElementById('m-leader').innerHTML=leaders.map(l=>`<option value="${l.id}|${l.name}"${l.name===leaderName?' selected':''}>${l.name}</option>`).join('');
+  document.getElementById('m-coleaders-wrap').innerHTML=coLeaderPickerHTML();
   openModal('modal-act');
 }
 
@@ -2154,6 +2158,7 @@ function openEdit(a){
   document.getElementById('m-start-time').value=a.start_time||'';
   document.getElementById('m-end-time').value=a.end_time||'';
   document.getElementById('m-evidence').value=a.evidence_url||'';document.getElementById('m-notes').value=a.notes||'';
+  document.getElementById('m-coleaders-wrap').innerHTML=coLeaderPickerHTML(a.co_leader_names||[]);
   closeModal('modal-detail');openModal('modal-act');
 }
 
@@ -2171,7 +2176,9 @@ async function saveActivity(){
   const[teacher_id,teacher_name]=teacherVal.split('|');
   const[leader_id,leader_name]=leaderVal.split('|');
   const month=monthFromDate(date);
-  const payload={teacher_id,teacher_name,leader_id,leader_name,type,date,month,status,notes,evidence_url,start_time,end_time,user_email:currentUser.email};
+  const coLeaders=getSelectedCoLeaders();
+  const co_leader_ids=coLeaders.map(c=>c.id), co_leader_names=coLeaders.map(c=>c.name);
+  const payload={teacher_id,teacher_name,leader_id,leader_name,co_leader_ids,co_leader_names,type,date,month,status,notes,evidence_url,start_time,end_time,user_email:currentUser.email};
   const btn=document.getElementById('save-btn');
   btn.textContent='Guardando...';btn.disabled=true;
   try{
@@ -3788,7 +3795,8 @@ function getFOAspectos(dom) {
 }
 
 function buildFormFO(a) {
-  foStep = 1; foSelectedDomain = null; foSelectedAspecto = null; foRespuestas = {}; foNotas = {}; foDatosGenerales = {}; foCoLeaders = [];
+  foStep = 1; foSelectedDomain = null; foSelectedAspecto = null; foRespuestas = {}; foNotas = {}; foDatosGenerales = {};
+  foCoLeaders = (a.co_leader_names||[]).map(n=>({id: leaders.find(l=>l.name===n)?.id||'', name:n}));
   renderFOStep(a);
 }
 
@@ -4066,7 +4074,7 @@ function buildFormLW(a) {
             ${['Inicio','Desarrollo','Cierre'].map(p=>`<option>${p}</option>`).join('')}
           </select></div>
       </div>
-      ${coLeaderPickerHTML()}
+      ${coLeaderPickerHTML(a.co_leader_names||[])}
 
       <div style="font-size:12px;font-weight:500;color:var(--ink);background:var(--paper2);padding:7px 10px;border-radius:var(--r-sm);margin-bottom:10px">Lo que observé</div>
       ${preguntas.map((p, i) => `
@@ -4166,7 +4174,7 @@ async function buildFormMC(a) {
         <div><label style="font-size:12px;font-weight:500;color:var(--ink3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Fecha</label>
           <input class="fc" value="${formatDate(a.date)}" readonly style="background:var(--paper)"></div>
       </div>
-      ${coLeaderPickerHTML(draft?.co_leader_names||[])}
+      ${coLeaderPickerHTML(draft?.co_leader_names||a.co_leader_names||[])}
 
       <div style="font-size:12px;font-weight:500;color:var(--ink);background:#eef0f8;color:#344080;padding:7px 10px;border-radius:var(--r-sm);margin-bottom:10px">Antes — Acuerdo con el docente</div>
       ${[
@@ -4283,7 +4291,7 @@ function buildFormFB(a) {
       <div style="margin-bottom:6px;padding:10px 14px;background:var(--teal-bg);border-radius:var(--r-sm)">
         <div style="font-size:12px;color:var(--teal-text);font-weight:500">Sesión de Feedback con ${a.teacher_name}</div>
       </div>
-      ${coLeaderPickerHTML()}
+      ${coLeaderPickerHTML(a.co_leader_names||[])}
       <div style="margin-top:14px">
         <div style="font-size:12px;font-weight:500;color:var(--ink);background:var(--paper2);padding:7px 10px;border-radius:var(--r-sm);margin-bottom:10px">Reflexión del docente</div>
         ${[
