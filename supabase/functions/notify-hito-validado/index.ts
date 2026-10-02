@@ -5,18 +5,26 @@
 // "Aprendizaje Activo y Clases Atractivas" (aprendizaje) y "Talleres
 // Innovation Lab" (lab).
 //
-// Requiere el secreto RESEND_API_KEY (ver README de este directorio / chat
-// con Claude para el paso a paso de alta en Resend).
+// Envía por SMTP usando una cuenta de servicio de Google Workspace
+// (chcbooks.com) — así el remitente es un dominio institucional ya
+// verificado, sin depender de registros DNS propios de ObservaDoc.
+// Requiere los secretos:
+//   SMTP_USER     cuenta de servicio, ej. observadoc@chcbooks.com
+//   SMTP_PASSWORD contraseña de aplicación (App Password) de esa cuenta
 //
 // Desplegar con verify_jwt = true (default): solo usuarios autenticados de
 // la app pueden disparar el envío.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
-const FROM_EMAIL = Deno.env.get("NOTIFY_FROM_EMAIL") || "ObservaDoc <onboarding@resend.dev>";
+const SMTP_USER = Deno.env.get("SMTP_USER")!;
+const SMTP_PASSWORD = Deno.env.get("SMTP_PASSWORD")!;
+const SMTP_HOST = Deno.env.get("SMTP_HOST") || "smtp.gmail.com";
+const SMTP_PORT = Number(Deno.env.get("SMTP_PORT") || "465");
+const FROM_EMAIL = Deno.env.get("NOTIFY_FROM_EMAIL") || `ObservaDoc <${SMTP_USER}>`;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -166,25 +174,29 @@ Deno.serve(async (req) => {
     validatedBy,
   });
 
-  const resendRes = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${RESEND_API_KEY}`,
-      "Content-Type": "application/json",
+  const client = new SMTPClient({
+    connection: {
+      hostname: SMTP_HOST,
+      port: SMTP_PORT,
+      tls: true,
+      auth: { username: SMTP_USER, password: SMTP_PASSWORD },
     },
-    body: JSON.stringify({
-      from: FROM_EMAIL,
-      to: [email],
-      subject: `✓ Hito validado: ${hitoNombre}`,
-      html,
-    }),
   });
 
-  if (!resendRes.ok) {
-    const errText = await resendRes.text();
-    return new Response(JSON.stringify({ ok: false, error: errText }), {
+  try {
+    await client.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: `✓ Hito validado: ${hitoNombre}`,
+      html,
+      content: "auto",
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ ok: false, error: String(err) }), {
       status: 502, headers: { ...CORS, "Content-Type": "application/json" },
     });
+  } finally {
+    await client.close();
   }
 
   return new Response(JSON.stringify({ ok: true }), {
