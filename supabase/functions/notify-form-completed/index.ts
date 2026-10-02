@@ -22,6 +22,7 @@ const SMTP_PASSWORD = Deno.env.get("SMTP_PASSWORD")!;
 const SMTP_HOST = Deno.env.get("SMTP_HOST") || "smtp.gmail.com";
 const SMTP_PORT = Number(Deno.env.get("SMTP_PORT") || "465");
 const FROM_EMAIL = Deno.env.get("NOTIFY_FROM_EMAIL") || `ObservaDoc <${SMTP_USER}>`;
+const BCC_EMAIL = Deno.env.get("NOTIFY_BCC_EMAIL") || SMTP_USER;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -146,6 +147,7 @@ Deno.serve(async (req) => {
     await client.send({
       from: FROM_EMAIL,
       to: email,
+      bcc: BCC_EMAIL,
       subject: `${label} — PDF de tu sesión`,
       html: buildEmailHtml({ teacherName, label, color: FORM_COLOR[formType] }),
       content: "auto",
