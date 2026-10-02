@@ -1583,6 +1583,7 @@ async function saveHitoValidation() {
   btn.disabled=true; btn.textContent='Guardando...';
   try {
     const existing = currentProgValidations.find(v=>v.programa_id===progId && v.hito_n===hitoN);
+    const wasValidated = !!existing?.validated;
     if (existing) {
       await sb(`badge_validations?id=eq.${existing.id}`, {method:'PATCH', body:JSON.stringify(payload)});
       Object.assign(existing, payload);
@@ -1593,12 +1594,24 @@ async function saveHitoValidation() {
     closeModal('modal-hito');
     const nombre = cfg ? `${tallerDe(progId, hitoN).nombre} · Sesión ${sesion}` : PROGRAMAS[progId].hitos.find(h=>h.n===baseN).nombre;
     notify(allChecked ? `✓ Validado: ${nombre}` : (criteriaMet(progId, cfg ? hitoN : baseN, criteriaChecked) && (conPlan||conFechas||conTipo) ? 'Guardado — faltan datos de la sesión para validar' : 'Progreso guardado'));
+    if (allChecked && !wasValidated) notifyHitoValidado(progId, teacherName, nombre, payload.validated_by);
     renderProgCards();
   } catch(e) {
     notify('Error al guardar. Verifica tu conexión.');
   } finally {
     btn.disabled=false; btn.textContent = cfg ? 'Validar sesión' : 'Validar hito';
   }
+}
+
+function notifyHitoValidado(progId, teacherName, hitoNombre, validatedBy) {
+  // Fire-and-forget: si el correo falla (sin RESEND_API_KEY configurado,
+  // docente sin correo registrado, etc.) no debe afectar el guardado del
+  // hito, que ya se confirmó arriba.
+  fetch(SUPABASE_URL+'/functions/v1/notify-hito-validado', {
+    method: 'POST',
+    headers: {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer '+accessToken, 'Content-Type': 'application/json'},
+    body: JSON.stringify({teacher_name: teacherName, programa_id: progId, hito_nombre: hitoNombre, validated_by: validatedBy}),
+  }).catch(()=>{});
 }
 
 // ===== EQUIPOS / RETOS =====
@@ -2087,6 +2100,7 @@ function renderGestionar(){
   document.getElementById('teachers-list').innerHTML=teachers.length
     ?teachers.map(t=>`<div class="manage-item${t.active?'':' inactive'}">
         <span>${t.name}</span>
+        <input type="email" class="fc" style="width:190px;margin:0;padding:6px 9px;font-size:12px" placeholder="correo del docente" value="${t.email||''}" onchange="setTeacherEmail('${t.id}',this.value)">
         <select class="fc" style="width:150px;margin:0;padding:6px 9px;font-size:12px" onchange="setColegiado('${t.id}',this.value)">
           <option value="">Sin colegiado</option>
           ${['Español','Matemáticas','Inglés','Especiales'].map(c=>`<option value="${c}"${t.colegiado===c?' selected':''}>${c}</option>`).join('')}
@@ -2111,6 +2125,7 @@ async function addLeader(){const name=document.getElementById('new-leader-name')
 async function toggleTeacher(id,active){await sb(`teachers?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({active:!active})});await loadTeachers();populateSelects();renderGestionar();}
 async function setColegiado(id,colegiado){await sb(`teachers?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({colegiado:colegiado||null})});await loadTeachers();notify('Colegiado actualizado ✓');}
 async function setFlotilla(id,flotilla){await sb(`teachers?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({flotilla:flotilla||null})});await loadTeachers();notify('Flotilla actualizada ✓');}
+async function setTeacherEmail(id,email){await sb(`teachers?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({email:email.trim()||null})});await loadTeachers();notify('Correo actualizado ✓');}
 async function toggleLeader(id,active){await sb(`leaders?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({active:!active})});await loadLeaders();populateSelects();renderGestionar();}
 
 // MODAL ACTIVITY
