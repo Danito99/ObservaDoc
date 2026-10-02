@@ -116,23 +116,26 @@ Deno.serve(async (req) => {
 
   const label = FORM_LABELS[formType];
   if (!label || !teacherName || !pdfBase64) {
+    console.log(`SKIP: datos incompletos — form_type=${formType} teacher_name="${teacherName}" pdf_len=${pdfBase64.length}`);
     return new Response(JSON.stringify({ ok: true, skipped: true }), {
       headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY);
-  const { data: teacherRows } = await admin
+  const { data: teacherRows, error: teacherErr } = await admin
     .from("teachers")
     .select("email")
     .eq("name", teacherName)
     .limit(1);
   const email = teacherRows?.[0]?.email;
   if (!email) {
+    console.log(`SKIP: sin correo para teacher_name="${teacherName}" — filas encontradas=${teacherRows?.length ?? 0} error=${teacherErr?.message ?? "ninguno"}`);
     return new Response(JSON.stringify({ ok: true, skipped: true, reason: "Sin correo registrado" }), {
       headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
+  console.log(`ENVIANDO a ${email} (docente="${teacherName}", form_type=${formType})`);
 
   const client = new SMTPClient({
     connection: {
@@ -161,6 +164,7 @@ Deno.serve(async (req) => {
       ],
     });
   } catch (err) {
+    console.log(`ERROR al enviar a ${email}: ${String(err)}`);
     return new Response(JSON.stringify({ ok: false, error: String(err) }), {
       status: 502, headers: { ...CORS, "Content-Type": "application/json" },
     });
@@ -168,6 +172,7 @@ Deno.serve(async (req) => {
     await client.close();
   }
 
+  console.log(`OK: correo enviado a ${email}`);
   return new Response(JSON.stringify({ ok: true }), {
     headers: { ...CORS, "Content-Type": "application/json" },
   });
