@@ -17,6 +17,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { encodeHeaderSubject } from "../_shared/subject-encode.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -259,7 +260,7 @@ Deno.serve(async (req) => {
         from: FROM_EMAIL,
         to: teacher.email,
         bcc: BCC_EMAIL,
-        subject: `✓ Hito validado: ${hitoNombre}`,
+        subject: encodeHeaderSubject(`✓ Hito validado: ${hitoNombre}`),
         html: buildEmailHtml({ teacherName, programaLabel, color, hitoNombre, validatedBy }),
         content: "auto",
       });
@@ -275,7 +276,7 @@ Deno.serve(async (req) => {
           from: FROM_EMAIL,
           to: mate.email,
           bcc: BCC_EMAIL,
-          subject: `🎉 ${teacherName} validó un hito — ¡felicítalo!`,
+          subject: encodeHeaderSubject(`🎉 ${teacherName} validó un hito — ¡felicítalo!`),
           html: teammateHtml,
           content: "auto",
         });

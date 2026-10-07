@@ -14,6 +14,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { encodeHeaderSubject } from "../_shared/subject-encode.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -151,7 +152,7 @@ Deno.serve(async (req) => {
       from: FROM_EMAIL,
       to: email,
       bcc: BCC_EMAIL,
-      subject: `${label} — PDF de tu sesión`,
+      subject: encodeHeaderSubject(`${label} — PDF de tu sesión`),
       html: buildEmailHtml({ teacherName, label, color: FORM_COLOR[formType] }),
       content: "auto",
       attachments: [
