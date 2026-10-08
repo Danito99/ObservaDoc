@@ -174,7 +174,8 @@ textarea.fc{resize:vertical;min-height:70px}
 .cal-ev.fo{background:#fef3e2;color:#c4700a}
 .cal-ev.fb{background:#fff1f2;color:#be123c}
 .cal-ev.mc{background:#eef0f8;color:#344080}
-.cal-more{font-size:10px;color:var(--ink3);cursor:pointer;padding:1px 4px}
+.cal-more{font-size:10px;color:var(--ink3);cursor:pointer;padding:1px 4px;text-decoration:underline}
+.cal-dnum.has-events{cursor:pointer}
 
 /* TEACHER CARD */
 .teacher-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
@@ -220,7 +221,8 @@ textarea.fc{resize:vertical;min-height:70px}
 
 /* LEADER CARD */
 .leader-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:22px}
-.leader-card{background:var(--white);border-radius:var(--r);border:1px solid var(--border);padding:14px 16px;box-shadow:var(--shadow)}
+.leader-card{background:var(--white);border-radius:var(--r);border:1px solid var(--border);padding:14px 16px;box-shadow:var(--shadow);cursor:pointer;transition:.15s}
+.leader-card:hover{border-color:var(--ch-orange)}
 .lc-types{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}
 
 /* MONTH TABLE */
@@ -551,7 +553,36 @@ textarea.fc{resize:vertical;min-height:70px}
           <option value="MAYO">Mayo</option><option value="JUNIO">Junio</option>
         </select>
       </div>
-      <div id="lideres-content"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+      <div id="lideres-grid-wrap"><div id="lideres-content"><div class="loading"><div class="spinner"></div>Cargando...</div></div></div>
+      <div id="lider-detail" style="display:none">
+        <div style="display:flex;align-items:center;gap:10px;margin-top:20px;margin-bottom:14px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="hideLiderDetail()">← Volver</button>
+          <h3 class="section-title" id="ld-name" style="margin-bottom:0"></h3>
+        </div>
+        <div class="filters" style="margin-bottom:14px">
+          <select class="fsel" id="f-ld-mes" onchange="showLeaderDetail()">
+            <option value="">Todos los meses</option>
+            <option value="SEPTIEMBRE">Septiembre</option><option value="OCTUBRE">Octubre</option>
+            <option value="NOVIEMBRE">Noviembre</option><option value="DICIEMBRE">Diciembre</option>
+            <option value="ENERO">Enero</option><option value="FEBRERO">Febrero</option>
+            <option value="MARZO">Marzo</option><option value="ABRIL">Abril</option>
+            <option value="MAYO">Mayo</option><option value="JUNIO">Junio</option>
+          </select>
+          <select class="fsel" id="f-ld-tipo" onchange="showLeaderDetail()">
+            <option value="">Todos los tipos</option>
+            <option value="LW">Learning Walk</option>
+            <option value="FO">Obs. Formal</option>
+            <option value="FB">Feedback</option>
+            <option value="MC">Modeling Class</option>
+          </select>
+          <select class="fsel" id="f-ld-status" onchange="showLeaderDetail()">
+            <option value="">Todos los estados</option>
+            <option value="pending">Programadas</option>
+            <option value="done">Completadas</option>
+          </select>
+        </div>
+        <div class="card" id="ld-table"></div>
+      </div>
     </div>
 
     <!-- MESES -->
@@ -945,6 +976,20 @@ textarea.fc{resize:vertical;min-height:70px}
     </div>
     <div class="modal-body" id="detail-body"></div>
     <div class="modal-ftr" id="detail-ftr"></div>
+  </div>
+</div>
+
+<!-- MODAL DETALLE DEL DÍA -->
+<div class="modal-overlay" id="modal-daydetail">
+  <div class="modal" style="width:620px">
+    <div class="modal-hdr">
+      <h3 id="daydetail-title">Actividades del día</h3>
+      <button class="modal-close" onclick="closeModal('modal-daydetail')">✕</button>
+    </div>
+    <div class="modal-body" id="daydetail-body" style="max-height:60vh;overflow-y:auto"></div>
+    <div class="modal-ftr">
+      <button class="btn btn-outline" onclick="closeModal('modal-daydetail')">Cerrar</button>
+    </div>
   </div>
 </div>
 
@@ -1821,16 +1866,22 @@ function renderDashboard() {
     </div>`;
   }).join('');
 
-  const maxL=Math.max(...leaders.map(l=>activities.filter(a=>leaderInvolved(a,l.name)).length),1);
-  document.getElementById('dash-lideres').innerHTML=leaders.map(l=>{
-    const cnt=activities.filter(a=>leaderInvolved(a,l.name)).length;
-    if(!cnt)return'';
-    return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <span style="font-size:12.5px;color:var(--ink2);min-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${shortName(l.name)}</span>
-      <div style="flex:1;height:6px;background:var(--paper2);border-radius:3px;overflow:hidden">
-        <div style="height:100%;width:${Math.round(cnt/maxL*100)}%;background:var(--ch-blue);border-radius:3px"></div>
+  const leaderStats=leaders.map(l=>{
+    const la=activities.filter(a=>leaderInvolved(a,l.name));
+    return{name:l.name,done:la.filter(a=>a.status==='done').length,total:la.length};
+  }).filter(x=>x.total>0).sort((a,b)=>b.done-a.done||b.total-a.total);
+  const maxL=Math.max(...leaderStats.map(x=>x.total),1);
+  document.getElementById('dash-lideres').innerHTML=leaderStats.map(x=>{
+    const pend=x.total-x.done;
+    return`<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
+        <span style="font-size:12.5px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${shortName(x.name)}</span>
+        <span style="font-size:11px;color:var(--ink3)">${x.done} completadas · ${pend} programadas</span>
       </div>
-      <span style="font-size:12.5px;font-weight:600;min-width:28px;text-align:right">${cnt}</span>
+      <div style="display:flex;height:6px;background:var(--paper2);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${Math.round(x.done/maxL*100)}%;background:var(--teal)"></div>
+        <div style="height:100%;width:${Math.round(pend/maxL*100)}%;background:var(--border)"></div>
+      </div>
     </div>`;
   }).join('')||'<p style="color:var(--ink3);font-size:13px">Sin datos aún</p>';
 
@@ -1924,9 +1975,9 @@ function renderCalendar(containerId, year, month, acts, onPrev, onNext) {
     const isToday=today.getFullYear()===year&&today.getMonth()===month&&today.getDate()===d;
     const da=byDate[ds]||[];
     const show=da.slice(0,3);const more=da.length-show.length;
-    html+=`<div class="cal-day${isToday?' today':''}" onclick="openNewForDate('${ds}')"><div class="cal-dnum">${d}</div>
+    html+=`<div class="cal-day${isToday?' today':''}" onclick="openNewForDate('${ds}')"><div class="cal-dnum${da.length?' has-events':''}" ${da.length?`onclick="event.stopPropagation();showDayDetail('${ds}')"`:''}>${d}</div>
       ${show.map(a=>`<div class="cal-ev ${TYPE_COLORS[a.type]}" onclick="event.stopPropagation();showDetail('${a.id}')" title="${a.teacher_name}">${a.type}·${shortName(a.teacher_name)}</div>`).join('')}
-      ${more>0?`<div class="cal-more" onclick="event.stopPropagation()">+${more} más</div>`:''}</div>`;
+      ${more>0?`<div class="cal-more" onclick="event.stopPropagation();showDayDetail('${ds}')">+${more} más</div>`:''}</div>`;
   }
   const rem=(firstDay+daysInMonth)%7===0?0:7-(firstDay+daysInMonth)%7;
   for(let i=1;i<=rem;i++)html+=`<div class="cal-day other"><div class="cal-dnum">${i}</div></div>`;
@@ -1936,6 +1987,23 @@ function renderCalendar(containerId, year, month, acts, onPrev, onNext) {
 
 function renderMainCal(){renderCalendar('main-cal',mainCalYear,mainCalMonth,activities,()=>{if(mainCalMonth===0){mainCalYear--;mainCalMonth=11;}else{mainCalMonth--;}renderMainCal();},()=>{if(mainCalMonth===11){mainCalYear++;mainCalMonth=0;}else{mainCalMonth++;}renderMainCal();});}
 function renderActCal(){renderCalendar('act-cal',calYear,calMonth,getFiltered(),()=>{if(calMonth===0){calYear--;calMonth=11;}else{calMonth--;}renderActCal();},()=>{if(calMonth===11){calYear++;calMonth=0;}else{calMonth++;}renderActCal();});}
+
+function showDayDetail(ds){
+  const acts=activities.filter(a=>a.date===ds).sort((a,b)=>(a.start_time||'').localeCompare(b.start_time||''));
+  document.getElementById('daydetail-title').textContent=`Actividades del ${formatDate(ds)}`;
+  document.getElementById('daydetail-body').innerHTML=acts.length?`<table class="tbl">
+    <thead><tr><th>Docente</th><th>Tipo</th><th>Líder</th><th>Hora</th><th>Estado</th><th></th></tr></thead>
+    <tbody>${acts.map(a=>`<tr class="${a.status==='done'?'done-row':''}">
+      <td><div style="display:flex;align-items:center;gap:7px"><span class="avatar">${initials(a.teacher_name)}</span><span style="font-size:12.5px">${shortName(a.teacher_name)}</span></div></td>
+      <td>${typeBadge(a.type)}</td>
+      <td style="font-size:12.5px">${a.leader_name||'—'}${coLeaderSuffix(a)}</td>
+      <td style="font-size:12.5px">${a.start_time||'—'}</td>
+      <td>${statusBadge(a.status)}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="closeModal('modal-daydetail');showDetail('${a.id}')">Ver</button></td>
+    </tr>`).join('')}</tbody>
+  </table>`:'<div class="empty"><p>Sin actividades este día</p></div>';
+  openModal('modal-daydetail');
+}
 
 // MY CALENDAR
 function renderMyCalendar() {
@@ -2038,31 +2106,70 @@ function renderLideres(){
   document.getElementById('lideres-content').innerHTML=`
     <div class="leader-grid">${leaders.map(l=>{
       const la=acts.filter(a=>leaderInvolved(a,l.name));
-      return`<div class="leader-card">
+      const done=la.filter(a=>a.status==='done').length;
+      const pend=la.length-done;
+      return`<div class="leader-card" onclick="showLeaderDetail('${l.name.replace(/'/g,"\\'")}')">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
           <div class="avatar">${initials(l.name)}</div>
           <div style="font-size:13.5px;font-weight:500">${l.name}</div>
         </div>
-        <div style="font-size:26px;font-weight:600;color:var(--teal)">${la.length}</div>
-        <div style="font-size:11.5px;color:var(--ink3);margin-top:2px">actividades realizadas</div>
+        <div style="display:flex;align-items:baseline;gap:10px">
+          <div><div style="font-size:26px;font-weight:600;color:var(--teal)">${done}</div><div style="font-size:11px;color:var(--ink3)">completadas</div></div>
+          <div><div style="font-size:18px;font-weight:600;color:var(--ink3)">${pend}</div><div style="font-size:11px;color:var(--ink3)">programadas</div></div>
+        </div>
         <div class="lc-types">${['LW','FO','FB','MC'].map(t=>{const cnt=la.filter(a=>a.type===t).length;return cnt?`<span class="badge b-${TYPE_COLORS[t]}">${t}: ${cnt}</span>`:''}).join('')}</div>
       </div>`;
     }).join('')}</div>
     <div class="section-title" style="margin-top:22px">Detalle por líder</div>
     <div class="card"><table class="tbl">
-      <thead><tr><th>Líder</th><th>LW</th><th>Obs. Formal</th><th>Feedback</th><th>Modeling</th><th>Total</th></tr></thead>
+      <thead><tr><th>Líder</th><th>LW</th><th>Obs. Formal</th><th>Feedback</th><th>Modeling</th><th>Completadas</th><th>Programadas</th><th>Total</th></tr></thead>
       <tbody>${leaders.map(l=>{
         const la=acts.filter(a=>leaderInvolved(a,l.name));
         const t=tipo=>la.filter(a=>a.type===tipo).length;
-        return`<tr><td><div style="display:flex;align-items:center;gap:7px"><div class="avatar">${initials(l.name)}</div>${l.name}</div></td>
+        const done=la.filter(a=>a.status==='done').length;
+        const pend=la.length-done;
+        return`<tr style="cursor:pointer" onclick="showLeaderDetail('${l.name.replace(/'/g,"\\'")}')"><td><div style="display:flex;align-items:center;gap:7px"><div class="avatar">${initials(l.name)}</div>${l.name}</div></td>
           <td><span class="badge b-lw">${t('LW')}</span></td>
           <td><span class="badge b-fo">${t('FO')}</span></td>
           <td><span class="badge b-fb">${t('FB')}</span></td>
           <td><span class="badge b-mc">${t('MC')}</span></td>
+          <td><span class="badge b-done">${done}</span></td>
+          <td><span class="badge b-pend">${pend}</span></td>
           <td><strong>${la.length}</strong></td></tr>`;
       }).join('')}</tbody>
     </table></div>`;
 }
+
+let currentLeaderName=null;
+function showLeaderDetail(name){
+  if(name)currentLeaderName=name;
+  const name2=currentLeaderName;
+  document.getElementById('ld-name').textContent=name2;
+  const mes=document.getElementById('f-ld-mes').value;
+  const tipo=document.getElementById('f-ld-tipo').value;
+  const status=document.getElementById('f-ld-status').value;
+  let acts=activities.filter(a=>leaderInvolved(a,name2));
+  if(mes)acts=acts.filter(a=>a.month===mes);
+  if(tipo)acts=acts.filter(a=>a.type===tipo);
+  if(status)acts=acts.filter(a=>a.status===status);
+  acts.sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('ld-table').innerHTML=`<table class="tbl">
+    <thead><tr><th>Docente</th><th>Tipo</th><th>Fecha</th><th>Mes</th><th>Estado</th><th>Evidencia</th><th></th></tr></thead>
+    <tbody>${acts.map(a=>`<tr class="${a.status==='done'?'done-row':''}">
+      <td><div style="display:flex;align-items:center;gap:7px"><span class="avatar">${initials(a.teacher_name)}</span><span style="font-size:12.5px">${shortName(a.teacher_name)}</span></div></td>
+      <td>${typeBadge(a.type)}</td>
+      <td style="font-size:12.5px">${formatDate(a.date)}</td>
+      <td style="font-size:12px;color:var(--ink3)">${cap(a.month||'')}</td>
+      <td>${statusBadge(a.status)}</td>
+      <td>${a.evidence_url?`<a class="evidence-link" href="${a.evidence_url}" target="_blank">📄 Ver</a>`:'—'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="showDetail('${a.id}')">Ver</button></td>
+    </tr>`).join('')}${!acts.length?'<tr><td colspan="7" style="text-align:center;color:var(--ink3);padding:20px">Sin actividades con estos filtros</td></tr>':''}</tbody>
+  </table>`;
+  document.getElementById('lideres-grid-wrap').style.display='none';
+  document.getElementById('lider-detail').style.display='block';
+}
+
+function hideLiderDetail(){document.getElementById('lider-detail').style.display='none';document.getElementById('lideres-grid-wrap').style.display='';}
 
 // MESES
 function renderMeses(){
