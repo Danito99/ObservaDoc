@@ -57,13 +57,26 @@ function cellValue(v: unknown): string | number | boolean {
   return String(v);
 }
 
+// La llave PEM es frágil al pegarla en un secreto: puede llegar con comillas
+// de sobra, con "\n" literal (dos caracteres) en vez de un salto real, o con
+// saltos de línea estilo Windows (\r\n) que rompen el parseo PEM. Esto
+// normaliza los casos típicos en vez de asumir que el pegado fue perfecto.
+function normalizePrivateKey(raw: string): string {
+  let key = raw.trim();
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+    key = key.slice(1, -1).trim();
+  }
+  key = key.replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  key = key.trim();
+  if (!key.endsWith("\n")) key += "\n";
+  return key;
+}
+
 async function getAccessToken(): Promise<string> {
   const auth = new GoogleAuth({
     credentials: {
       client_email: GOOGLE_SA_EMAIL,
-      // Los secretos a veces guardan el salto de línea como "\n" literal en
-      // vez de un salto real — normalizamos por si acaso.
-      private_key: GOOGLE_SA_PRIVATE_KEY.replace(/\\n/g, "\n"),
+      private_key: normalizePrivateKey(GOOGLE_SA_PRIVATE_KEY),
     },
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
