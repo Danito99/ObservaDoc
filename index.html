@@ -5066,7 +5066,12 @@ function closeCoachingDetail() {
 
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
-document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
+// Los modales con formularios no se cierran al dar clic en el fondo, para
+// no perder el progreso por un clic accidental — hay que usar "Cancelar" o "✕".
+const MODALS_SIN_CIERRE_AL_CLIC_AFUERA = new Set(['modal-form','modal-act','modal-hito','modal-challenge']);
+document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{
+  if(e.target===m && !MODALS_SIN_CIERRE_AL_CLIC_AFUERA.has(m.id))m.classList.remove('open');
+}));
 
 function notify(msg){const n=document.getElementById('notif');n.textContent=msg;n.classList.add('show');setTimeout(()=>n.classList.remove('show'),2800);}
 
