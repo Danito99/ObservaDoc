@@ -3572,7 +3572,7 @@ const DOM_NAMES_PDF = {
 
 const SCALE_LABELS = ['0 — Nula evidencia','1 — Evidencia limitada','2 — Evidencia parcial','3 — Evidencia sólida'];
 
-async function generateFOPDF(formData, activityData, opts={}) {
+async function generateFOPDF(formData, activityData) {
   const {
     leader_name, teacher_name, nivel, grupo, materia, objetivo,
     parte_clase, fecha, dominio, aspecto, respuestas, notas,
@@ -3735,31 +3735,30 @@ ${(estrategias||[]).length ? `
 <\/body>
 <\/html>`;
 
-  if (opts.silent) return html;
-
-  const win = window.open('', '_blank');
-  if (win) {
-    win.document.write(html + '<script>window.onload = () => window.print();<\/script>');
-    win.document.close();
-  } else {
-    notify('Permite ventanas emergentes para descargar el documento');
-  }
+  return html;
 }
 
 async function loadAndGenerateFOPDF(activityId) {
+  // La ventana se abre aquí, de inmediato, para que el navegador la asocie
+  // al clic del usuario — si se abre tras el await de abajo, Chrome/Safari
+  // la bloquean como pop-up (casi siempre sin avisar, así que parece que
+  // "no pasa nada").
+  const win = window.open('', '_blank');
+  if (!win) { notify('Permite ventanas emergentes para descargar el documento'); return; }
   try {
     const forms = await sb(`form_fo?activity_id=eq.${activityId}&order=created_at.desc&limit=1`);
-    if (!forms || !forms.length) { notify('No hay formulario completado para esta actividad'); return; }
+    if (!forms || !forms.length) { win.close(); notify('No hay formulario completado para esta actividad'); return; }
     const act = activities.find(a => a.id === activityId);
-    await generateFOPDF(forms[0], act);
-  } catch(e) { notify('Error al cargar el formulario'); console.error(e); }
+    const html = await generateFOPDF(forms[0], act);
+    writeToWindow(win, html + '<script>window.onload = () => window.print();<\/script>');
+  } catch(e) { win.close(); notify('Error al cargar el formulario'); console.error(e); }
 }
 
-function openPDFWindow(html) {
-  const win = window.open('', '_blank');
+function writeToWindow(win, html) {
   if (win) { win.document.write(html); win.document.close(); }
   else notify('Permite ventanas emergentes para descargar el documento');
 }
+function openPDFWindow(html) { writeToWindow(window.open('', '_blank'), html); }
 
 function buildLWHtml(f) {
   const preguntas = [
@@ -3798,12 +3797,14 @@ function buildLWHtml(f) {
 }
 
 async function loadAndGenerateLWPDF(activityId) {
+  const win = window.open('', '_blank');
+  if (!win) { notify('Permite ventanas emergentes para descargar el documento'); return; }
   try {
     const forms = await sb(`form_lw?activity_id=eq.${activityId}&order=created_at.desc&limit=1`);
-    if (!forms || !forms.length) { notify('No hay formulario completado para esta actividad'); return; }
+    if (!forms || !forms.length) { win.close(); notify('No hay formulario completado para esta actividad'); return; }
     const html = buildLWHtml(forms[0]).replace('</body></html>', `<scr`+`ipt>window.onload=()=>window.print();</scr`+`ipt></body></html>`);
-    openPDFWindow(html);
-  } catch(e) { notify('Error al cargar el formulario'); }
+    writeToWindow(win, html);
+  } catch(e) { win.close(); notify('Error al cargar el formulario'); }
 }
 
 function buildFBHtml(f) {
@@ -3840,12 +3841,14 @@ function buildFBHtml(f) {
 }
 
 async function loadAndGenerateFBPDF(activityId) {
+  const win = window.open('', '_blank');
+  if (!win) { notify('Permite ventanas emergentes para descargar el documento'); return; }
   try {
     const forms = await sb(`form_fb?activity_id=eq.${activityId}&order=created_at.desc&limit=1`);
-    if (!forms || !forms.length) { notify('No hay formulario completado para esta actividad'); return; }
+    if (!forms || !forms.length) { win.close(); notify('No hay formulario completado para esta actividad'); return; }
     const html = buildFBHtml(forms[0]).replace('</body></html>', `<scr`+`ipt>window.onload=()=>window.print();</scr`+`ipt></body></html>`);
-    openPDFWindow(html);
-  } catch(e) { notify('Error al cargar el formulario'); }
+    writeToWindow(win, html);
+  } catch(e) { win.close(); notify('Error al cargar el formulario'); }
 }
 
 function buildMCHtml(f) {
@@ -3880,12 +3883,14 @@ function buildMCHtml(f) {
 }
 
 async function loadAndGenerateMCPDF(activityId) {
+  const win = window.open('', '_blank');
+  if (!win) { notify('Permite ventanas emergentes para descargar el documento'); return; }
   try {
     const forms = await sb(`form_mc?activity_id=eq.${activityId}&order=created_at.desc&limit=1`);
-    if (!forms || !forms.length) { notify('No hay formulario completado para esta actividad'); return; }
+    if (!forms || !forms.length) { win.close(); notify('No hay formulario completado para esta actividad'); return; }
     const html = buildMCHtml(forms[0]).replace('</body></html>', `<scr`+`ipt>window.onload=()=>window.print();</scr`+`ipt></body></html>`);
-    openPDFWindow(html);
-  } catch(e) { notify('Error al cargar el formulario'); }
+    writeToWindow(win, html);
+  } catch(e) { win.close(); notify('Error al cargar el formulario'); }
 }
 
 // ---- Generación de PDF real (no window.print) para adjuntar por correo ----
@@ -3932,7 +3937,7 @@ async function emailFormPdf(formType, activityId, teacherName) {
       const forms = await sb(`form_fo?activity_id=eq.${activityId}&order=created_at.desc&limit=1`);
       if (!forms?.length) return;
       const act = activities.find(a => a.id === activityId);
-      html = await generateFOPDF(forms[0], act, {silent:true});
+      html = await generateFOPDF(forms[0], act);
     } else {
       const forms = await sb(`form_${formType}?activity_id=eq.${activityId}&order=created_at.desc&limit=1`);
       if (!forms?.length) return;
