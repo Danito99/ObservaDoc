@@ -845,7 +845,7 @@ textarea.fc{resize:vertical;min-height:70px}
   <div class="modal" style="width:640px;margin:auto">
     <div class="modal-hdr">
       <h3 id="form-title">Formulario</h3>
-      <button class="modal-close" onclick="closeModal('modal-form')">✕</button>
+      <button class="modal-close" onclick="closeFormModal()">✕</button>
     </div>
     <div id="form-body" style="padding:0"></div>
   </div>
@@ -2544,7 +2544,12 @@ async function loadReportData() {
       sb('form_fb?order=created_at.desc'),
       sb('badge_validations?ciclo_escolar=eq.2026-2027&programa_id=neq.gamificacion'),
     ]);
-    rptData = {lw, fo, mc, fb, badges};
+    // Mientras la actividad no esté 'done', su fila en form_xx es un
+    // borrador (ver "---- BORRADORES ----") — no una observación
+    // terminada, así que no debe contarse aquí.
+    const doneIds = new Set(activities.filter(a=>a.status==='done').map(a=>a.id));
+    const onlyDone = (rows) => rows.filter(r=>doneIds.has(r.activity_id));
+    rptData = {lw: onlyDone(lw), fo: onlyDone(fo), mc: onlyDone(mc), fb: onlyDone(fb), badges};
   } catch(e) { console.error('Error loading report data', e); }
 }
 
@@ -4040,6 +4045,45 @@ function getSelectedCoLeaders() {
   });
 }
 
+// ---- BORRADORES ----
+// Cada form_xx tiene a lo más una fila por activity_id mientras la actividad
+// no esté 'done': esa fila ES el borrador. Guardar borrador = upsert sin
+// tocar activities.status; completar = el mismo upsert + marcar status done.
+// Así no se necesita una tabla ni columna nueva para borradores.
+async function upsertForm(table, activityId, payload) {
+  const existing = await sb(`${table}?activity_id=eq.${activityId}&limit=1`);
+  if (existing && existing.length) {
+    await sb(`${table}?id=eq.${existing[0].id}`, {method:'PATCH', body: JSON.stringify(payload)});
+  } else {
+    await sb(table, {method:'POST', body: JSON.stringify(payload)});
+  }
+}
+
+// Al cerrar el formulario con "✕" (ahora la única forma de salir, ya que el
+// clic afuera del modal no cierra los formularios) se guarda lo que haya
+// como borrador, sin pedírselo explícitamente al usuario.
+async function closeFormModal() {
+  try { await saveCurrentFormDraft(); } catch(e) { console.error('No se pudo guardar el borrador', e); }
+  closeModal('modal-form');
+}
+
+async function saveCurrentFormDraft() {
+  if (!currentFormActivity || currentFormActivity.status === 'done') return;
+  const type = currentFormActivity.type;
+  if (type === 'FO') await saveFODraft();
+  else if (type === 'LW' && document.getElementById('lw-bien')) {
+    const hasContent = [0,1,2,3,4].some(i=>document.getElementById(`lw_obs_${i}`)?.value.trim())
+      || document.getElementById('lw-bien')?.value.trim() || document.getElementById('lw-pregunta')?.value.trim();
+    if (hasContent) await submitLW(false);
+  } else if (type === 'FB' && document.getElementById('fb-q4')) {
+    const hasContent = ['fb-q1','fb-q2','fb-q3','fb-q4','fb-q5','fb-q6','fb-q7','fb-q8'].some(id=>document.getElementById(id)?.value.trim())
+      || document.getElementById('fb-fecha-seg')?.value;
+    if (hasContent) await submitFB(false);
+  } else if (type === 'MC' && document.getElementById('mc-dificultad')?.value.trim()) {
+    await submitMC(false);
+  }
+}
+
 // ---- FO FORM ----
 let foStep = 1, foSelectedDomain = null, foSelectedAspecto = null, foIndicators = [], foPrefix = 'fo';
 let foFlatIndicators = [];
@@ -4079,11 +4123,75 @@ function getFOAspectos(dom) {
   return entries;
 }
 
-function buildFormFO(a) {
+async function buildFormFO(a) {
   foStep = 1; foSelectedDomain = null; foSelectedAspecto = null; foRespuestas = {}; foNotas = {}; foDatosGenerales = {};
   foFlatIndicators = [];
   foCoLeaders = (a.co_leader_names||[]).map(n=>({id: leaders.find(l=>l.name===n)?.id||'', name:n}));
+
+  // Retomar borrador existente si lo hay (ver "---- BORRADORES ----")
+  let draft = null;
+  try {
+    const existing = await sb(`form_fo?activity_id=eq.${a.id}&limit=1`);
+    if (existing && existing.length) draft = existing[0];
+  } catch(e) {}
+
+  if (draft) {
+    foDatosGenerales = {
+      nivel: draft.nivel||'', grupo: draft.grupo||'', materia: draft.materia||'',
+      objetivo: draft.objetivo||'', parte_clase: draft.parte_clase||'', fecha: draft.fecha||a.date
+    };
+    if (draft.co_leader_names?.length) {
+      foCoLeaders = draft.co_leader_names.map((n,i)=>({id: draft.co_leader_ids?.[i]||'', name:n}));
+    }
+    foSelectedDomain = draft.dominio || null;
+    foRespuestas = typeof draft.respuestas === 'string' ? JSON.parse(draft.respuestas) : (draft.respuestas||{});
+    foNotas = typeof draft.notas === 'string' ? JSON.parse(draft.notas) : (draft.notas||{});
+    // Retoma en el paso de indicadores si ya había dominio elegido —
+    // ahí es donde de verdad vale la pena no perder el avance.
+    foStep = foSelectedDomain ? 3 : (foDatosGenerales.objetivo ? 2 : 1);
+    notify('Retomando tu borrador guardado ✓');
+  }
   renderFOStep(a);
+}
+
+// Guarda el avance de la FO como borrador (fila en form_fo sin marcar la
+// actividad como 'done'). Solo aplica desde el paso 2 en adelante: antes de
+// eso (nivel/objetivo aún sin validar) no hay nada sólido que valga guardar.
+async function saveFODraft() {
+  if (foStep < 2) return;
+  if (foStep === 3) {
+    // Capturar el estado de las tarjetas visibles antes de guardar
+    const respuestas = {}, notas = {};
+    foFlatIndicators.forEach((_, i) => {
+      const sel = document.querySelector(`input[name="fo_ind_${i}"]:checked`);
+      if (sel) respuestas[i] = parseInt(sel.value);
+      const nota = document.getElementById(`nota_fo_ind_${i}`);
+      if (nota && nota.value.trim()) notas[i] = nota.value.trim();
+    });
+    foRespuestas = respuestas; foNotas = notas;
+  }
+  const co_leader_ids = foCoLeaders.map(c=>c.id), co_leader_names = foCoLeaders.map(c=>c.name);
+  const payload = {
+    activity_id: currentFormActivity.id,
+    leader_name: currentProfile?.leader_name,
+    teacher_name: currentFormActivity.teacher_name,
+    co_leader_ids, co_leader_names,
+    nivel: foDatosGenerales.nivel, grupo: foDatosGenerales.grupo, materia: foDatosGenerales.materia,
+    objetivo: foDatosGenerales.objetivo, parte_clase: foDatosGenerales.parte_clase, fecha: foDatosGenerales.fecha,
+    dominio: foSelectedDomain || undefined,
+    aspecto: foSelectedDomain ? getFOAspectos(FORM_DATA.fo.dominios[foSelectedDomain]).map(([k])=>k).join(', ') : undefined,
+    respuestas: foRespuestas, notas: foNotas
+  };
+  if (foStep === 4) {
+    payload.que_salio_bien = document.getElementById('fo-bien')?.value || undefined;
+    payload.que_mejorar = document.getElementById('fo-mejorar')?.value || undefined;
+    payload.compromisos = document.getElementById('fo-compromisos')?.value || undefined;
+    const val = document.querySelector('input[name="fo_valoracion"]:checked');
+    payload.valoracion_general = val ? parseInt(val.value) : undefined;
+    payload.estrategias = getEstrategiasChecked('fo_estrategias');
+  }
+  await upsertForm('form_fo', currentFormActivity.id, payload);
+  notify('Borrador guardado — puedes seguir llenando más tarde ✓');
 }
 
 // El paso 3 (todas las tarjetas de indicadores) necesita mucho más ancho
@@ -4328,7 +4436,7 @@ async function submitFO() {
   btn.textContent = 'Guardando...'; btn.disabled = true;
   try {
     const co_leader_ids = foCoLeaders.map(c=>c.id), co_leader_names = foCoLeaders.map(c=>c.name);
-    await sb('form_fo', {method:'POST', body: JSON.stringify({
+    await upsertForm('form_fo', currentFormActivity.id, {
       activity_id: currentFormActivity.id,
       leader_name: currentProfile?.leader_name,
       teacher_name: currentFormActivity.teacher_name,
@@ -4347,7 +4455,7 @@ async function submitFO() {
       compromisos: document.getElementById('fo-compromisos')?.value,
       valoracion_general: valoracionEl ? parseInt(valoracionEl.value) : null,
       estrategias: getEstrategiasChecked('fo_estrategias')
-    })});
+    });
     await sb(`activities?id=eq.${currentFormActivity.id}`, {method:'PATCH', body: JSON.stringify({status:'done', co_leader_ids, co_leader_names})});
     await loadActivities();
     emailFormPdf('fo', currentFormActivity.id, currentFormActivity.teacher_name);
@@ -4359,7 +4467,7 @@ async function submitFO() {
 }
 
 // ---- LW FORM ----
-function buildFormLW(a) {
+async function buildFormLW(a) {
   const preguntas = [
     '¿Qué están haciendo los estudiantes en este momento?',
     '¿El objetivo de la clase es visible y los alumnos lo conocen?',
@@ -4367,6 +4475,14 @@ function buildFormLW(a) {
     '¿La tecnología presente está siendo usada para aprender o solo para ilustrar?',
     '¿Qué está haciendo el docente mientras los alumnos trabajan?'
   ];
+
+  // Retomar borrador existente si lo hay (ver "---- BORRADORES ----")
+  let draft = null;
+  try {
+    const existing = await sb(`form_lw?activity_id=eq.${a.id}&limit=1`);
+    if (existing && existing.length) draft = existing[0];
+  } catch(e) {}
+  const obs = draft?.observaciones || {};
 
   document.getElementById('form-body').innerHTML = `
     <div style="padding:18px 22px">
@@ -4376,44 +4492,49 @@ function buildFormLW(a) {
         <div><label style="font-size:12px;font-weight:500;color:var(--ink3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">¿En qué parte entraste?</label>
           <select class="fc" id="lw-parte">
             <option value="">Selecciona</option>
-            ${['Inicio','Desarrollo','Cierre'].map(p=>`<option>${p}</option>`).join('')}
+            ${['Inicio','Desarrollo','Cierre'].map(p=>`<option ${draft?.parte_clase===p?'selected':''}>${p}</option>`).join('')}
           </select></div>
       </div>
-      ${coLeaderPickerHTML(a.co_leader_names||[])}
+      ${coLeaderPickerHTML(draft?.co_leader_names||a.co_leader_names||[])}
 
       <div style="font-size:12px;font-weight:500;color:var(--ink);background:var(--paper2);padding:7px 10px;border-radius:var(--r-sm);margin-bottom:10px">Lo que observé</div>
       ${preguntas.map((p, i) => `
         <div style="padding:10px 0;border-bottom:1px solid var(--border)">
           <div style="font-size:13px;color:var(--ink);line-height:1.5;margin-bottom:7px">${i+1}. ${p}</div>
-          <textarea id="lw_obs_${i}" placeholder="Anota lo que observaste..." style="width:100%;padding:6px 9px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;font-family:'Outfit',sans-serif;resize:none;min-height:52px;outline:none;color:var(--ink);background:var(--paper)"></textarea>
+          <textarea id="lw_obs_${i}" placeholder="Anota lo que observaste..." style="width:100%;padding:6px 9px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;font-family:'Outfit',sans-serif;resize:none;min-height:52px;outline:none;color:var(--ink);background:var(--paper)">${obs[i]||''}</textarea>
         </div>`).join('')}
 
       <div style="font-size:12px;font-weight:500;color:var(--ink);background:var(--paper2);padding:7px 10px;border-radius:var(--r-sm);margin-top:14px;margin-bottom:10px">Devolución al docente (2–3 min)</div>
       <div style="padding:10px 0;border-bottom:1px solid var(--border)">
         <div style="font-size:13px;color:var(--ink);line-height:1.5;margin-bottom:7px">Una cosa que funcionó bien</div>
-        <textarea class="fc" id="lw-bien" placeholder="¿Qué destacarías de lo que viste?" style="min-height:60px"></textarea>
+        <textarea class="fc" id="lw-bien" placeholder="¿Qué destacarías de lo que viste?" style="min-height:60px">${draft?.devolucion_positiva||''}</textarea>
       </div>
       <div style="padding:10px 0;border-bottom:1px solid var(--border)">
         <div style="font-size:13px;color:var(--ink);line-height:1.5;margin-bottom:7px">Una pregunta que abre reflexión <span style="font-size:11px;color:var(--ink3)">(no una instrucción)</span></div>
-        <textarea class="fc" id="lw-pregunta" placeholder="Ej: ¿Qué crees que generó ese nivel de participación?" style="min-height:60px"></textarea>
+        <textarea class="fc" id="lw-pregunta" placeholder="Ej: ¿Qué crees que generó ese nivel de participación?" style="min-height:60px">${draft?.pregunta_reflexion||''}</textarea>
       </div>
       <div style="padding:10px 0">
         <div style="font-size:13px;color:var(--ink);line-height:1.5;margin-bottom:7px">Apertura del docente a la devolución</div>
         <div style="display:flex;gap:8px">
           ${['Alta','Parcial','Baja'].map(v=>`<label style="cursor:pointer">
-            <input type="radio" name="lw_apertura" value="${v}" style="display:none">
+            <input type="radio" name="lw_apertura" value="${v}" style="display:none" ${draft?.apertura_docente===v?'checked':''}>
             <div data-name="lw_apertura" data-val="${v}" onclick="selectLW(this)"
-              style="padding:6px 14px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12.5px;font-weight:500;color:var(--ink3);background:var(--white);cursor:pointer;transition:.15s">
+              style="padding:6px 14px;border:1px solid ${draft?.apertura_docente===v?'var(--teal)':'var(--border)'};border-radius:var(--r-sm);font-size:12.5px;font-weight:500;${draft?.apertura_docente===v?'background:var(--teal);color:#fff':'color:var(--ink3);background:var(--white)'};cursor:pointer;transition:.15s">
               ${v}
             </div>
           </label>`).join('')}
         </div>
       </div>
-      ${estrategiasChecklistHTML('lw_estrategias')}
+      ${estrategiasChecklistHTML('lw_estrategias', draft?.estrategias||[])}
     </div>
-    <div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">
-      <button style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:var(--r-sm);font-size:13.5px;font-family:'Outfit',sans-serif;font-weight:500;cursor:pointer;border:none;background:#F59120;color:#fff" id="lw-submit-btn" onclick="submitLW()">Guardar LW ✓</button>
+    <div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:12px;color:var(--ink3)">Puedes guardar y continuar en otro momento</span>
+      <div style="display:flex;gap:8px">
+        <button style="display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:var(--r-sm);font-size:13px;font-family:'Outfit',sans-serif;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--ink)" id="lw-submit-btn" onclick="submitLW(false)">Guardar borrador</button>
+        <button style="display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:var(--r-sm);font-size:13px;font-family:'Outfit',sans-serif;font-weight:500;cursor:pointer;border:none;background:#F59120;color:#fff" onclick="submitLW(true)">Completar ✓</button>
+      </div>
     </div>`;
+  if (draft) notify('Retomando tu borrador guardado ✓');
 }
 
 function selectLW(el) {
@@ -4426,9 +4547,9 @@ function selectLW(el) {
   document.querySelector(`input[name="${name}"][value="${el.dataset.val}"]`).checked=true;
 }
 
-async function submitLW() {
+async function submitLW(markDone) {
   const bien = document.getElementById('lw-bien')?.value.trim();
-  if (!bien) { notify('Completa al menos la devolución positiva al docente'); return; }
+  if (markDone && !bien) { notify('Completa al menos la devolución positiva al docente'); return; }
   const btn = document.getElementById('lw-submit-btn');
   btn.textContent='Guardando...'; btn.disabled=true;
   const observaciones = {};
@@ -4440,7 +4561,7 @@ async function submitLW() {
   try {
     const coLeaders = getSelectedCoLeaders();
     const co_leader_ids = coLeaders.map(c=>c.id), co_leader_names = coLeaders.map(c=>c.name);
-    await sb('form_lw', {method:'POST', body: JSON.stringify({
+    await upsertForm('form_lw', currentFormActivity.id, {
       activity_id: currentFormActivity.id,
       leader_name: currentProfile?.leader_name,
       teacher_name: currentFormActivity.teacher_name,
@@ -4452,15 +4573,22 @@ async function submitLW() {
       pregunta_reflexion: document.getElementById('lw-pregunta')?.value,
       apertura_docente: apertura,
       estrategias: getEstrategiasChecked('lw_estrategias')
-    })});
-    await sb(`activities?id=eq.${currentFormActivity.id}`,{method:'PATCH',body:JSON.stringify({status:'done', co_leader_ids, co_leader_names})});
-    await loadActivities();
-    emailFormPdf('lw', currentFormActivity.id, currentFormActivity.teacher_name);
-    closeModal('modal-form');
-    notify('Learning Walk guardado y sesión completada ✓');
-    renderCurrentPage();
+    });
+    if (markDone) {
+      await sb(`activities?id=eq.${currentFormActivity.id}`,{method:'PATCH',body:JSON.stringify({status:'done', co_leader_ids, co_leader_names})});
+      await loadActivities();
+      emailFormPdf('lw', currentFormActivity.id, currentFormActivity.teacher_name);
+      closeModal('modal-form');
+      notify('Learning Walk guardado y sesión completada ✓');
+      renderCurrentPage();
+    } else {
+      await sb(`activities?id=eq.${currentFormActivity.id}`,{method:'PATCH',body:JSON.stringify({co_leader_ids, co_leader_names})});
+      await loadActivities();
+      notify('Borrador guardado — puedes seguir llenando más tarde ✓');
+      renderCurrentPage();
+    }
   } catch(e){notify('Error al guardar.');}
-  btn.textContent='Guardar LW ✓'; btn.disabled=false;
+  btn.textContent='Guardar borrador'; btn.disabled=false;
 }
 
 // ---- MC FORM ----
@@ -4547,8 +4675,6 @@ async function submitMC(markDone = false) {
   const btn = document.getElementById('mc-submit-btn');
   btn.textContent='Guardando...'; btn.disabled=true;
   try {
-    // Verificar si ya existe un registro para esta actividad
-    const existing = await sb(`form_mc?activity_id=eq.${currentFormActivity.id}&limit=1`);
     const coLeaders = getSelectedCoLeaders();
     const co_leader_ids = coLeaders.map(c=>c.id), co_leader_names = coLeaders.map(c=>c.name);
     const payload = {
@@ -4567,11 +4693,7 @@ async function submitMC(markDone = false) {
       fecha_seguimiento:document.getElementById('mc-fecha-seg')?.value||null,
       disposicion_docente:document.querySelector('input[name="mc_disposicion"]:checked')?.value||null
     };
-    if(existing && existing.length) {
-      await sb(`form_mc?id=eq.${existing[0].id}`,{method:'PATCH',body:JSON.stringify(payload)});
-    } else {
-      await sb('form_mc',{method:'POST',body:JSON.stringify(payload)});
-    }
+    await upsertForm('form_mc', currentFormActivity.id, payload);
     if(markDone) {
       await sb(`activities?id=eq.${currentFormActivity.id}`,{method:'PATCH',body:JSON.stringify({status:'done', co_leader_ids, co_leader_names})});
       await loadActivities();
@@ -4592,86 +4714,101 @@ async function submitMC(markDone = false) {
 }
 
 // ---- FB FORM ----
-function buildFormFB(a) {
+async function buildFormFB(a) {
+  // Retomar borrador existente si lo hay (ver "---- BORRADORES ----")
+  let draft = null;
+  try {
+    const existing = await sb(`form_fb?activity_id=eq.${a.id}&limit=1`);
+    if (existing && existing.length) draft = existing[0];
+  } catch(e) {}
+  const v = (field) => draft?.[field] || '';
+
   document.getElementById('form-body').innerHTML = `
     <div style="padding:18px 22px">
       <div style="margin-bottom:6px;padding:10px 14px;background:var(--teal-bg);border-radius:var(--r-sm)">
         <div style="font-size:12px;color:var(--teal-text);font-weight:500">Sesión de Feedback con ${a.teacher_name}</div>
       </div>
-      ${coLeaderPickerHTML(a.co_leader_names||[])}
+      ${coLeaderPickerHTML(draft?.co_leader_names||a.co_leader_names||[])}
       <div style="margin-top:14px">
         <div style="font-size:12px;font-weight:500;color:var(--ink);background:var(--paper2);padding:7px 10px;border-radius:var(--r-sm);margin-bottom:10px">Reflexión del docente</div>
         ${[
-          ['fb-q1','¿Qué momento de la sesión considera que funcionó mejor y por qué?'],
-          ['fb-q2','¿Hubo algo que no salió como esperaba? ¿Qué cambiaría?'],
-          ['fb-q3','¿Los estudiantes lograron el objetivo de la sesión? ¿Cómo lo sabe?']
-        ].map(([id,lbl])=>`<div style="margin-bottom:12px">
+          ['fb-q1','¿Qué momento de la sesión considera que funcionó mejor y por qué?','momento_exitoso'],
+          ['fb-q2','¿Hubo algo que no salió como esperaba? ¿Qué cambiaría?','algo_no_salio'],
+          ['fb-q3','¿Los estudiantes lograron el objetivo de la sesión? ¿Cómo lo sabe?','objetivo_logrado']
+        ].map(([id,lbl,field])=>`<div style="margin-bottom:12px">
           <label style="font-size:12.5px;color:var(--ink);display:block;margin-bottom:5px;line-height:1.4">${lbl}</label>
-          <textarea class="fc" id="${id}" placeholder="Respuesta..." style="min-height:65px"></textarea>
+          <textarea class="fc" id="${id}" placeholder="Respuesta..." style="min-height:65px">${v(field)}</textarea>
         </div>`).join('')}
       </div>
       <div style="margin-top:6px">
         <div style="font-size:12px;font-weight:500;color:var(--ink);background:var(--paper2);padding:7px 10px;border-radius:var(--r-sm);margin-bottom:10px">Retroalimentación del líder</div>
         ${[
-          ['fb-q4','¿Qué fortalezas metodológicas observaste en la sesión?'],
-          ['fb-q5','¿Qué área de mejora específica identificaste?'],
-          ['fb-q6','¿Qué estrategia o ajuste concreto le sugeriste al docente?']
-        ].map(([id,lbl])=>`<div style="margin-bottom:12px">
+          ['fb-q4','¿Qué fortalezas metodológicas observaste en la sesión?','fortalezas'],
+          ['fb-q5','¿Qué área de mejora específica identificaste?','area_mejora'],
+          ['fb-q6','¿Qué estrategia o ajuste concreto le sugeriste al docente?','estrategia_sugerida']
+        ].map(([id,lbl,field])=>`<div style="margin-bottom:12px">
           <label style="font-size:12.5px;color:var(--ink);display:block;margin-bottom:5px;line-height:1.4">${lbl}</label>
-          <textarea class="fc" id="${id}" placeholder="Respuesta..." style="min-height:65px"></textarea>
+          <textarea class="fc" id="${id}" placeholder="Respuesta..." style="min-height:65px">${v(field)}</textarea>
         </div>`).join('')}
       </div>
       <div style="margin-top:6px">
         <div style="font-size:12px;font-weight:500;color:var(--ink);background:var(--paper2);padding:7px 10px;border-radius:var(--r-sm);margin-bottom:10px">Cierre — Compromisos y seguimiento</div>
         <div style="margin-bottom:12px">
           <label style="font-size:12.5px;color:var(--ink);display:block;margin-bottom:5px;line-height:1.4">¿Qué cosa específica va a probar diferente el docente antes de la próxima observación? <span style="color:var(--rose-text)">*</span> <span style="font-size:11px;color:var(--ink3)">(en sus propias palabras)</span></label>
-          <textarea class="fc" id="fb-q7" placeholder="Compromiso concreto y observable..." style="min-height:70px"></textarea>
+          <textarea class="fc" id="fb-q7" placeholder="Compromiso concreto y observable..." style="min-height:70px">${v('compromiso_docente')}</textarea>
         </div>
         <div style="margin-bottom:12px">
           <label style="font-size:12.5px;color:var(--ink);display:block;margin-bottom:5px;line-height:1.4">¿Qué necesita del líder para que ese compromiso sea posible?</label>
-          <textarea class="fc" id="fb-q8" placeholder="Apoyo, recurso o acompañamiento ofrecido..." style="min-height:65px"></textarea>
+          <textarea class="fc" id="fb-q8" placeholder="Apoyo, recurso o acompañamiento ofrecido..." style="min-height:65px">${v('apoyo_lider')}</textarea>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
           <div><label style="font-size:12px;font-weight:500;color:var(--ink3);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Fecha de seguimiento *</label>
-            <input type="date" class="fc" id="fb-fecha-seg"></div>
+            <input type="date" class="fc" id="fb-fecha-seg" value="${v('fecha_seguimiento')}"></div>
           <div>
             <label style="font-size:12px;font-weight:500;color:var(--ink3);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Disposición del docente</label>
             <div style="display:flex;gap:6px;padding-top:2px">
-              ${['Alta','Parcial','Baja'].map(v=>`<label style="cursor:pointer">
-                <input type="radio" name="fb_disposicion" value="${v}" style="display:none">
-                <div data-name="fb_disposicion" data-val="${v}" onclick="selectLW(this)"
-                  style="padding:5px 12px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;font-weight:500;color:var(--ink3);background:var(--white);cursor:pointer;transition:.15s">
-                  ${v}
+              ${['Alta','Parcial','Baja'].map(v2=>`<label style="cursor:pointer">
+                <input type="radio" name="fb_disposicion" value="${v2}" style="display:none" ${draft?.disposicion_docente===v2?'checked':''}>
+                <div data-name="fb_disposicion" data-val="${v2}" onclick="selectLW(this)"
+                  style="padding:5px 12px;border:1px solid ${draft?.disposicion_docente===v2?'var(--teal)':'var(--border)'};border-radius:var(--r-sm);font-size:12px;font-weight:500;${draft?.disposicion_docente===v2?'background:var(--teal);color:#fff':'color:var(--ink3);background:var(--white)'};cursor:pointer;transition:.15s">
+                  ${v2}
                 </div>
               </label>`).join('')}
             </div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
-          <input type="checkbox" id="fb-relacionado" style="width:16px;height:16px;accent-color:var(--teal)">
+          <input type="checkbox" id="fb-relacionado" ${draft?.relacionado_fo?'checked':''} style="width:16px;height:16px;accent-color:var(--teal)">
           <label for="fb-relacionado" style="font-size:13px;color:var(--ink);cursor:pointer">Relacionado con una FO previa</label>
         </div>
       </div>
     </div>
-    <div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">
-      <button style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:var(--r-sm);font-size:13.5px;font-family:'Outfit',sans-serif;font-weight:500;cursor:pointer;border:none;background:#F59120;color:#fff" id="fb-submit-btn" onclick="submitFB()">Guardar feedback ✓</button>
+    <div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:12px;color:var(--ink3)">Puedes guardar y continuar en otro momento</span>
+      <div style="display:flex;gap:8px">
+        <button style="display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:var(--r-sm);font-size:13px;font-family:'Outfit',sans-serif;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--ink)" id="fb-submit-btn" onclick="submitFB(false)">Guardar borrador</button>
+        <button style="display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:var(--r-sm);font-size:13px;font-family:'Outfit',sans-serif;font-weight:500;cursor:pointer;border:none;background:#F59120;color:#fff" onclick="submitFB(true)">Completar ✓</button>
+      </div>
     </div>`;
+  if (draft) notify('Retomando tu borrador guardado ✓');
 }
 
-async function submitFB() {
+async function submitFB(markDone) {
   const q4 = document.getElementById('fb-q4')?.value.trim();
   const q5 = document.getElementById('fb-q5')?.value.trim();
   const q7 = document.getElementById('fb-q7')?.value.trim();
   const fechaSeg = document.getElementById('fb-fecha-seg')?.value;
-  if (!q4||!q5) { notify('Completa las fortalezas y el área de mejora'); return; }
-  if (!q7) { notify('Completa el compromiso del docente'); return; }
-  if (!fechaSeg) { notify('Agrega una fecha de seguimiento'); return; }
+  if (markDone) {
+    if (!q4||!q5) { notify('Completa las fortalezas y el área de mejora'); return; }
+    if (!q7) { notify('Completa el compromiso del docente'); return; }
+    if (!fechaSeg) { notify('Agrega una fecha de seguimiento'); return; }
+  }
   const btn = document.getElementById('fb-submit-btn');
   btn.textContent='Guardando...'; btn.disabled=true;
   try {
     const coLeaders = getSelectedCoLeaders();
     const co_leader_ids = coLeaders.map(c=>c.id), co_leader_names = coLeaders.map(c=>c.name);
-    await sb('form_fb',{method:'POST',body:JSON.stringify({
+    await upsertForm('form_fb', currentFormActivity.id, {
       activity_id:currentFormActivity.id,
       leader_name:currentProfile?.leader_name,
       teacher_name:currentFormActivity.teacher_name,
@@ -4685,20 +4822,27 @@ async function submitFB() {
       estrategia_sugerida:document.getElementById('fb-q6')?.value,
       compromiso_docente:q7,
       apoyo_lider:document.getElementById('fb-q8')?.value,
-      fecha_seguimiento:fechaSeg,
+      fecha_seguimiento:fechaSeg||null,
       disposicion_docente:document.querySelector('input[name="fb_disposicion"]:checked')?.value||null,
       relacionado_fo:document.getElementById('fb-relacionado')?.checked||false
-    })});
-    await sb(`activities?id=eq.${currentFormActivity.id}`,{method:'PATCH',body:JSON.stringify({status:'done', co_leader_ids, co_leader_names})});
-    await loadActivities();
-    const teacherName = currentFormActivity.teacher_name, leaderName = currentProfile?.leader_name;
-    emailFormPdf('fb', currentFormActivity.id, teacherName);
-    closeModal('modal-form');
-    notify('Feedback guardado y sesión completada ✓');
-    renderCurrentPage();
-    openFollowUpModal(teacherName, leaderName, fechaSeg);
+    });
+    if (markDone) {
+      await sb(`activities?id=eq.${currentFormActivity.id}`,{method:'PATCH',body:JSON.stringify({status:'done', co_leader_ids, co_leader_names})});
+      await loadActivities();
+      const teacherName = currentFormActivity.teacher_name, leaderName = currentProfile?.leader_name;
+      emailFormPdf('fb', currentFormActivity.id, teacherName);
+      closeModal('modal-form');
+      notify('Feedback guardado y sesión completada ✓');
+      renderCurrentPage();
+      openFollowUpModal(teacherName, leaderName, fechaSeg);
+    } else {
+      await sb(`activities?id=eq.${currentFormActivity.id}`,{method:'PATCH',body:JSON.stringify({co_leader_ids, co_leader_names})});
+      await loadActivities();
+      notify('Borrador guardado — puedes seguir llenando más tarde ✓');
+      renderCurrentPage();
+    }
   } catch(e){notify('Error al guardar.');}
-  btn.textContent='Guardar feedback ✓'; btn.disabled=false;
+  btn.textContent='Guardar borrador'; btn.disabled=false;
 }
 // ===================== END FORMS =====================
 
