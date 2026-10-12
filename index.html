@@ -3987,20 +3987,6 @@ function openForm(activityId) {
 }
 
 // ---- SHARED ----
-function scaleHTML(name, idx) {
-  return `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:6px">
-    ${[0,1,2,3].map(v=>`<label style="cursor:pointer;text-align:center">
-      <input type="radio" name="${name}_${idx}" value="${v}" style="display:none">
-      <div class="scale-radio-btn" data-name="${name}_${idx}" data-val="${v}" onclick="selectScale(this)"
-        style="padding:7px 4px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:13px;font-weight:500;color:var(--ink3);background:var(--white);cursor:pointer;transition:.15s;text-align:center">
-        ${v}
-      </div>
-      <div style="font-size:10px;color:var(--ink3);margin-top:2px;line-height:1.2">${['Nula','Limitada','Parcial','Sólida'][v]}</div>
-    </label>`).join('')}
-  </div>
-  <textarea placeholder="Notas (opcional)..." style="width:100%;padding:6px 9px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;font-family:'Outfit',sans-serif;resize:none;min-height:48px;outline:none;color:var(--ink);background:var(--paper)" id="nota_${name}_${idx}"></textarea>`;
-}
-
 function selectScale(el) {
   const name = el.dataset.name;
   document.querySelectorAll(`[data-name="${name}"]`).forEach(b => {
@@ -4012,17 +3998,10 @@ function selectScale(el) {
   el.style.color = '#fff';
   el.style.borderColor = 'var(--teal)';
   document.querySelector(`input[name="${name}"][value="${el.dataset.val}"]`).checked = true;
-}
-
-function getScaleValues(prefix, count) {
-  const respuestas = {}, notas = {};
-  for (let i=0; i<count; i++) {
-    const sel = document.querySelector(`input[name="${prefix}_${i}"]:checked`);
-    if (sel) respuestas[i] = parseInt(sel.value);
-    const nota = document.getElementById(`nota_${prefix}_${i}`);
-    if (nota && nota.value.trim()) notas[i] = nota.value.trim();
-  }
-  return {respuestas, notas};
+  // En el grid de tarjetas de la FO, marca el numerito de la tarjeta como
+  // contestado para que se identifique de un vistazo cuáles faltan.
+  const badge = el.closest('.fo-card')?.querySelector('.fo-card-badge');
+  if (badge) { badge.style.background = 'var(--teal)'; badge.style.color = '#fff'; }
 }
 
 // ---- ESTRATEGIAS OBSERVADAS (checklist al final de LW y FO) ----
@@ -4063,6 +4042,7 @@ function getSelectedCoLeaders() {
 
 // ---- FO FORM ----
 let foStep = 1, foSelectedDomain = null, foSelectedAspecto = null, foIndicators = [], foPrefix = 'fo';
+let foFlatIndicators = [];
 let foRespuestas = {}, foNotas = {};
 let foDatosGenerales = {}, foCoLeaders = [];
 
@@ -4101,11 +4081,21 @@ function getFOAspectos(dom) {
 
 function buildFormFO(a) {
   foStep = 1; foSelectedDomain = null; foSelectedAspecto = null; foRespuestas = {}; foNotas = {}; foDatosGenerales = {};
+  foFlatIndicators = [];
   foCoLeaders = (a.co_leader_names||[]).map(n=>({id: leaders.find(l=>l.name===n)?.id||'', name:n}));
   renderFOStep(a);
 }
 
+// El paso 3 (todas las tarjetas de indicadores) necesita mucho más ancho
+// que los demás pasos — se amplía el modal solo mientras se está en ese
+// paso, para que quepan varias tarjetas por fila y se vean todas de un vistazo.
+function setFOModalWidth(step) {
+  const modalEl = document.querySelector('#modal-form .modal');
+  if (modalEl) modalEl.style.width = step === 3 ? 'min(1280px, 96vw)' : '640px';
+}
+
 function renderFOStep(a) {
+  setFOModalWidth(foStep);
   const body = document.getElementById('form-body');
   const sty = 'padding:18px 22px';
   
@@ -4171,37 +4161,41 @@ function renderFOStep(a) {
   else if (foStep === 3) {
     const dom = FORM_DATA.fo.dominios[foSelectedDomain];
     const aspectos = getFOAspectos(dom);
-    // Build flat indicator list with aspect grouping
-    let globalIdx = 0;
-    const aspectBlocks = aspectos.map(([asp, inds]) => {
-      const startIdx = globalIdx;
-      const block = `
-        <div style="margin-bottom:16px">
-          <div style="background:${dom.color||'#2B91CF'};color:#fff;font-size:12px;font-weight:500;padding:7px 12px;border-radius:var(--r-sm) var(--r-sm) 0 0">${asp}</div>
-          <div style="border:1px solid var(--border);border-top:none;border-radius:0 0 var(--r-sm) var(--r-sm);padding:12px">
-            <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-              ${[0,1,2,3].map(v=>`<span style="font-size:10.5px;background:${v===3?'#e8f4fb':'var(--paper2)'};color:${v===3?'#1a6fa3':'var(--ink3)'};padding:2px 8px;border-radius:20px">${v}=${['Nula','Limitada','Parcial','Sólida'][v]}</span>`).join('')}
-            </div>
-            ${inds.map((ind, i) => {
-              const gi = startIdx + i;
-              const anclas = FO_ANCLAS[asp]?.[i];
-              return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-                <div style="font-size:12.5px;color:var(--ink);margin-bottom:7px;line-height:1.5">${i+1}. ${ind}</div>
-                ${anclas ? `<div style="font-size:10.5px;color:var(--ink3);line-height:1.5;margin-bottom:8px;background:var(--paper);border-radius:var(--r-sm);padding:6px 8px">${anclas.map((a,v)=>`<div><b>${v}</b> — ${a}</div>`).join('')}</div>` : ''}
-                ${scaleHTML('fo_ind', gi)}
-              </div>`;
-            }).join('')}
-          </div>
-        </div>`;
-      globalIdx += inds.length;
-      return block;
-    }).join('');
+    // Todas las tarjetas visibles a la vez, en cuadrícula y sin agrupar por
+    // aspecto — así se identifican y califican de un vistazo, en el orden
+    // en que ocurren las cosas en el salón, no en el orden del formulario.
     foIndicators = aspectos.flatMap(([,inds]) => inds);
+    foFlatIndicators = aspectos.flatMap(([asp, inds]) => inds.map((text, i) => ({aspecto: asp, text, anclas: FO_ANCLAS[asp]?.[i]})));
+
+    const cards = foFlatIndicators.map((item, idx) => {
+      const savedVal = foRespuestas[idx];
+      const answered = savedVal !== undefined;
+      return `
+      <div class="fo-card" style="border:1.5px solid var(--border);border-radius:var(--r);padding:14px;background:var(--white);display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+          <span class="fo-card-badge" style="width:22px;height:22px;border-radius:50%;background:${answered?'var(--teal)':'var(--paper2)'};color:${answered?'#fff':'var(--ink3)'};font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">${idx+1}</span>
+          <span style="font-size:10px;font-weight:600;color:#fff;background:${dom.color||'#2B91CF'};padding:3px 8px;border-radius:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.aspecto}</span>
+        </div>
+        <div style="font-size:12.5px;color:var(--ink);line-height:1.45;margin-bottom:10px;flex:1">${item.text}</div>
+        ${item.anclas ? `<details style="margin-bottom:10px">
+          <summary style="font-size:10.5px;color:var(--ink3);cursor:pointer">Ver escala 0–3</summary>
+          <div style="font-size:10px;color:var(--ink3);line-height:1.5;margin-top:6px;background:var(--paper);border-radius:var(--r-sm);padding:7px 9px">${item.anclas.map((a,v)=>`<div style="margin-bottom:2px"><b>${v}</b> — ${a}</div>`).join('')}</div>
+        </details>` : ''}
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:6px">
+          ${[0,1,2,3].map(v=>`<label style="cursor:pointer;text-align:center">
+            <input type="radio" name="fo_ind_${idx}" value="${v}" style="display:none" ${savedVal===v?'checked':''}>
+            <div class="scale-radio-btn" data-name="fo_ind_${idx}" data-val="${v}" onclick="selectScale(this)"
+              style="padding:7px 4px;border:1px solid ${savedVal===v?'var(--teal)':'var(--border)'};border-radius:var(--r-sm);font-size:13px;font-weight:600;color:${savedVal===v?'#fff':'var(--ink3)'};background:${savedVal===v?'var(--teal)':'var(--white)'};cursor:pointer;transition:.15s">${v}</div>
+          </label>`).join('')}
+        </div>
+        <textarea placeholder="Notas (opcional)..." style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:11.5px;font-family:'Outfit',sans-serif;resize:none;min-height:42px;outline:none;color:var(--ink);background:var(--paper)" id="nota_fo_ind_${idx}">${foNotas[idx]||''}</textarea>
+      </div>`;
+    }).join('');
 
     body.innerHTML = `<div style="${sty}">
       <div style="font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Paso 3 de 4 — ${foSelectedDomain}: ${dom.nombre}</div>
-      <div style="font-size:12px;color:var(--ink3);margin-bottom:14px">Completa los indicadores que observaste. Puedes dejar vacíos los que no apliquen.</div>
-      ${aspectBlocks}
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:14px">Califica los indicadores en el orden en que los veas — no tienen que ser en orden. Puedes dejar vacíos los que no apliquen.</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">${cards}</div>
     </div>
     <div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:space-between">
       <button style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:var(--r-sm);font-size:13.5px;font-family:'Outfit',sans-serif;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--ink)" onclick="foStep=2;renderFOStep(currentFormActivity)">← Atrás</button>
@@ -4307,13 +4301,18 @@ function foNext() {
     if (!foSelectedDomain) { notify('Elige un dominio para continuar'); return; }
     foStep = 3;
   } else if (foStep===3) {
-    // Check at least one indicator was filled
-    const filled = foIndicators.some((_, i) => document.querySelector(`input[name="fo_ind_${i}"]:checked`));
+    const filled = foFlatIndicators.some((_, i) => document.querySelector(`input[name="fo_ind_${i}"]:checked`));
     if (!filled) { notify('Completa al menos un indicador antes de continuar'); return; }
     // Capturar respuestas/notas ANTES de que el paso 4 reemplace este HTML
-    const captured = getScaleValues('fo_ind', foIndicators.length);
-    foRespuestas = captured.respuestas;
-    foNotas = captured.notas;
+    const respuestas = {}, notas = {};
+    foFlatIndicators.forEach((_, i) => {
+      const sel = document.querySelector(`input[name="fo_ind_${i}"]:checked`);
+      if (sel) respuestas[i] = parseInt(sel.value);
+      const nota = document.getElementById(`nota_fo_ind_${i}`);
+      if (nota && nota.value.trim()) notas[i] = nota.value.trim();
+    });
+    foRespuestas = respuestas;
+    foNotas = notas;
     foStep = 4;
   }
   renderFOStep(currentFormActivity);
