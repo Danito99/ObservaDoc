@@ -2319,10 +2319,19 @@ async function backupToSheets(){
   btn.disabled=true; btn.textContent='Respaldando...';
   status.textContent='Copiando todas las tablas a Google Sheets...';
   try{
-    const res=await fetch(SUPABASE_URL+'/functions/v1/backup-to-sheets', {
+    let res=await fetch(SUPABASE_URL+'/functions/v1/backup-to-sheets', {
       method:'POST',
       headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},
     });
+    if(res.status===401){
+      const refreshed=await refreshToken();
+      if(refreshed){
+        res=await fetch(SUPABASE_URL+'/functions/v1/backup-to-sheets', {
+          method:'POST',
+          headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},
+        });
+      }
+    }
     const data=await res.json().catch(()=>({}));
     if(!res.ok||!data.ok) throw new Error(data.error||`HTTP ${res.status}`);
     const resumen=(data.tables||[]).map(t=>`${t.name}: ${t.rows}`).join(' · ');
