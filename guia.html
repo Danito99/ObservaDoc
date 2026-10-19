@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guía de procedimientos · ObservaDoc · Christel House México</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#F59120">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ObservaDoc">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ch-orange:#F59120;--ch-orange-dark:#F37021;
+  --teal:#2B91CF;--teal-bg:#e8f4fb;--teal-text:#1a6fa3;
+  --amber:#F59120;--amber-bg:#fef3e2;--amber-text:#c4700a;
+  --rose:#e11d48;--rose-bg:#fff1f2;--rose-text:#be123c;
+  --violet:#44579C;--violet-bg:#eef0f8;--violet-text:#344080;
+  --ink:#414042;--ink2:#5a5758;--ink3:#8e8c8d;
+  --paper:#f7f5f2;--paper2:#ede9e4;--border:#d8d4cf;
+  --white:#ffffff;--r:10px;--r-sm:6px;--shadow:0 1px 3px rgba(0,0,0,.06);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Outfit',sans-serif;background:var(--paper);color:var(--ink);line-height:1.55}
+.layout{display:flex;min-height:100vh}
+
+/* ---- SIDEBAR / TOC ---- */
+.toc{width:252px;flex-shrink:0;background:#1f1e1f;padding:22px 16px;position:sticky;top:0;align-self:flex-start;height:100vh;overflow-y:auto}
+.toc-brand{margin-bottom:18px}
+.toc-brand .t1{font-family:'Playfair Display',serif;color:#fff;font-size:16px;letter-spacing:-.2px}
+.toc-brand .t2{color:rgba(255,255,255,.55);font-size:11.5px;margin-top:3px;line-height:1.4}
+.toc-sec{color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:14px 8px 5px}
+.toc a{display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:var(--r-sm);color:rgba(255,255,255,.72);font-size:12.5px;text-decoration:none;transition:.15s;margin-bottom:1px}
+.toc a:hover{background:rgba(255,255,255,.1);color:#fff}
+.toc a .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:rgba(255,255,255,.3)}
+.toc-back{display:block;margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.55);font-size:12px;text-decoration:none}
+.toc-back:hover{color:#fff}
+
+/* ---- MAIN ---- */
+.main{flex:1;min-width:0;padding:36px 44px 90px;max-width:900px}
+.hero{margin-bottom:38px}
+.hero h1{font-family:'Playfair Display',serif;font-size:30px;color:var(--ink)}
+.hero p{color:var(--ink3);font-size:14px;margin-top:8px;max-width:620px}
+section{margin-bottom:44px;scroll-margin-top:24px}
+section h2{font-family:'Playfair Display',serif;font-size:21px;color:var(--ink);margin-bottom:6px;display:flex;align-items:center;gap:10px}
+section > p.lead{color:var(--ink2);font-size:13.5px;margin-bottom:16px;max-width:640px}
+h3.sub{font-family:'Playfair Display',serif;font-size:15px;color:var(--ink);margin:18px 0 8px}
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:14px}
+ol,ul{padding-left:20px;font-size:13.5px;color:var(--ink2)}
+ol li,ul li{margin-bottom:6px}
+.badge-row{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.type-icon{width:30px;height:30px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.callout{border-left:3px solid var(--ch-orange);background:var(--amber-bg);border-radius:var(--r-sm);padding:12px 14px;font-size:13px;color:var(--ink2);margin-top:12px}
+.callout b{color:var(--ink)}
+.rules{border-radius:var(--r);padding:16px 18px;margin-top:10px}
+.rules .rules-lbl{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:9px;display:flex;align-items:center;gap:6px}
+.rules ul{margin:0;padding-left:18px}
+.type-sec{border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:18px;background:var(--white);box-shadow:var(--shadow);scroll-margin-top:24px}
+.type-hdr{padding:16px 20px;display:flex;align-items:center;gap:12px}
+.type-hdr h3{font-family:'Playfair Display',serif;font-size:17px;color:#fff}
+.type-hdr .purp{font-size:12px;color:rgba(255,255,255,.85);margin-top:2px}
+.type-body{padding:18px 20px}
+.type-body h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);margin-bottom:8px}
+.steps{counter-reset:step}
+.steps li{list-style:none;position:relative;padding-left:26px;margin-bottom:9px;font-size:13px;color:var(--ink2)}
+.steps li::before{counter-increment:step;content:counter(step);position:absolute;left:0;top:0;width:18px;height:18px;border-radius:50%;background:var(--paper2);color:var(--ink3);font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+kbd{background:var(--paper2);border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:12px;font-family:'Outfit',sans-serif;color:var(--ink)}
+.faq{border-bottom:1px solid var(--border);padding:12px 0}
+.faq summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--ink);list-style:none;display:flex;align-items:center;gap:8px}
+.faq summary::before{content:'+';color:var(--ch-orange);font-weight:700;width:14px}
+.faq[open] summary::before{content:'–'}
+.faq p{font-size:13px;color:var(--ink2);margin-top:8px;padding-left:22px}
+.pillgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px}
+@media(max-width:480px){.pillgrid{grid-template-columns:1fr}}
+
+@media(max-width:900px){
+  .layout{flex-direction:column}
+  .toc{position:static;width:100%;height:auto;max-height:none}
+  .main{padding:28px 20px 70px;max-width:100%}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <nav class="toc">
+    <div class="toc-brand">
+      <div class="t1">ObservaDoc</div>
+      <div class="t2">Guía de procedimientos<br>Christel House México</div>
+    </div>
+
+    <div class="toc-sec">Para empezar</div>
+    <a href="#intro"><span class="dot" style="background:var(--ch-orange)"></span>¿Qué es esta guía?</a>
+    <a href="#registrar"><span class="dot" style="background:var(--ch-orange)"></span>Registrar una actividad</a>
+
+    <div class="toc-sec">Tipos de observación</div>
+    <a href="#lw"><span class="dot" style="background:var(--teal)"></span>Learning Walk</a>
+    <a href="#mc"><span class="dot" style="background:var(--violet)"></span>Modeling Class</a>
+    <a href="#fo"><span class="dot" style="background:var(--amber)"></span>Observación Formal</a>
+    <a href="#fb"><span class="dot" style="background:var(--rose)"></span>Feedback</a>
+
+    <div class="toc-sec">Seguimiento</div>
+    <a href="#borradores"><span class="dot"></span>Borradores y ediciones</a>
+    <a href="#vistas"><span class="dot"></span>Actividades, calendario y filtros</a>
+    <a href="#outlook"><span class="dot"></span>Sincronizar con Outlook</a>
+    <a href="#reportes"><span class="dot"></span>Reportes</a>
+    <a href="#coaching"><span class="dot"></span>Ciclos de coaching</a>
+    <a href="#programas"><span class="dot"></span>Programas y hitos</a>
+
+    <div class="toc-sec">Administración</div>
+    <a href="#gestionar"><span class="dot"></span>Gestionar equipo</a>
+    <a href="#pdfs"><span class="dot"></span>Generar PDFs</a>
+    <a href="#faq"><span class="dot"></span>Preguntas frecuentes</a>
+
+    <a class="toc-back" href="index.html">← Volver a ObservaDoc</a>
+  </nav>
+
+  <main class="main">
+    <div class="hero">
+      <h1>Guía de procedimientos</h1>
+      <p>Cómo usar ObservaDoc y qué se espera en cada tipo de observación de aula. Pensada para líderes académicos y coaches de Christel House México — tanto para quien recién empieza a usar la plataforma como para repasar las reglas de cada formato.</p>
+    </div>
+
+    <section id="intro">
+      <h2>¿Qué es ObservaDoc?</h2>
+      <p class="lead">ObservaDoc es donde se registra, documenta y da seguimiento a todo el acompañamiento docente del ciclo: Learning Walks, Observaciones Formales, Feedback, Modeling Class, ciclos de coaching y los hitos de los programas de formación. Cada actividad que registras aquí alimenta los reportes, el historial del docente y tu propio calendario.</p>
+      <div class="callout">💡 Esta guía combina dos cosas: <b>cómo se hace en la plataforma</b> (los clics) y <b>cómo debe hacerse como procedimiento</b> (las reglas de acompañamiento). Ambas importan — un formulario bien llenado de una observación mal hecha no cumple el propósito.</div>
+    </section>
+
+    <section id="registrar">
+      <h2>Registrar una actividad</h2>
+      <p class="lead">Todas las observaciones —sin importar el tipo— empiezan igual: se agenda la actividad y después se llena su formulario específico.</p>
+      <div class="card">
+        <h4 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);margin-bottom:10px">Agendar</h4>
+        <ol class="steps">
+          <li>Ve a <b>Actividades</b> o <b>Calendario</b> y pulsa <b>+ Nueva actividad</b>.</li>
+          <li>Elige <b>Docente</b> y <b>Líder</b>. Si otro líder te acompaña en la misma visita, márcalo como co-líder dentro del formulario — así no se crea una segunda actividad duplicada y ambos quedan con acceso a ella.</li>
+          <li>Elige el <b>Tipo</b> (Learning Walk, Observación Formal, Feedback o Modeling Class) y la <b>Fecha</b>. Puedes agregar hora de inicio/fin, una liga de evidencia de Google Drive y notas.</li>
+          <li>Guarda. La actividad queda como <b>Pendiente</b> hasta que llenes su formulario.</li>
+        </ol>
+        <h4 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);margin:16px 0 10px">Completar el formulario</h4>
+        <ol class="steps">
+          <li>En la lista de <b>Actividades</b>, busca la fila pendiente y pulsa <b>📋 Llenar</b> — o abre el detalle de la actividad y pulsa <b>📋 Iniciar formulario</b>.</li>
+          <li>Responde el formulario según el tipo (ver las secciones siguientes). Puedes guardar como borrador y continuar después.</li>
+          <li>Al terminar, márcala como completada. Si necesitas corregir algo después, puedes volver a abrir el formulario de una actividad ya completada con <b>✏️ Editar formulario</b>.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="lw">
+      <h2>Los cuatro tipos de observación</h2>
+      <p class="lead">Cada formato tiene un propósito distinto. Usar el tipo equivocado para lo que realmente quieres lograr con el docente le resta valor al acompañamiento.</p>
+
+      <div class="type-sec">
+        <div class="type-hdr" style="background:var(--teal)">
+          <div class="type-icon" style="background:rgba(255,255,255,.2)">☰</div>
+          <div><h3>Learning Walk</h3><div class="purp">Visita breve a clase, retroalimentación inmediata</div></div>
+        </div>
+        <div class="type-body">
+          <h4>Cómo registrarlo</h4>
+          <ol class="steps">
+            <li>Indica en qué parte de la clase entraste (Inicio, Desarrollo o Cierre).</li>
+            <li>Responde las 5 preguntas de observación: qué hacen los estudiantes, si el objetivo es visible, si hay pensamiento más allá de ejecución, si la tecnología apoya el aprendizaje, y qué hace el docente.</li>
+            <li>Registra la devolución al docente: una cosa que funcionó bien y una pregunta que abra reflexión.</li>
+            <li>Marca la apertura del docente a la devolución (Alta / Parcial / Baja) y, si aplica, las estrategias observadas.</li>
+          </ol>
+          <div class="rules" style="background:var(--teal-bg)">
+            <div class="rules-lbl" style="color:var(--teal-text)">⚑ Reglas del procedimiento</div>
+            <ul>
+              <li>Es una visita <b>breve</b>: anotaciones puntuales, no un análisis extenso.</li>
+              <li>Las intervenciones son <b>en el momento</b> y puntuales — nunca le quitan tiempo de enseñanza al docente ni interrumpen el flujo de la clase.</li>
+              <li>La devolución es <b>oral e inmediata</b> (2–3 minutos): una cosa positiva + una pregunta que invite a reflexionar, nunca una instrucción.</li>
+              <li>No se agenda una sesión aparte de feedback — el Learning Walk se resuelve en la misma visita.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="type-sec" id="mc">
+        <div class="type-hdr" style="background:var(--violet)">
+          <div class="type-icon" style="background:rgba(255,255,255,.2)">◆</div>
+          <div><h3>Modeling Class</h3><div class="purp">El líder modela frente al grupo del docente</div></div>
+        </div>
+        <div class="type-body">
+          <h4>Cómo registrarlo</h4>
+          <ol class="steps">
+            <li><b>Antes:</b> registra qué quiere lograr el docente con su grupo, la dificultad real que origina el modelaje, y qué le pediste que observara específicamente mientras tú enseñas.</li>
+            <li><b>Durante:</b> marca qué se modeló (Yo hago-nosotros hacemos-ustedes hacen, monitoreo, rutinas, tecnología, gamificación, evaluación formativa, u otro).</li>
+            <li><b>Después:</b> registra qué notó el docente, a qué se comprometió para la próxima semana, y qué necesita adaptar a su estilo y grupo. Agrega fecha de seguimiento y disposición del docente.</li>
+          </ol>
+          <div class="rules" style="background:var(--violet-bg)">
+            <div class="rules-lbl" style="color:var(--violet-text)">⚑ Reglas del procedimiento</div>
+            <ul>
+              <li>Los objetivos de la clase se <b>acuerdan con anticipación</b> junto con el docente — no es una sorpresa para él.</li>
+              <li>La clase se prepara <b>alineada al contenido</b> que el docente está trabajando con ese grupo en ese momento.</li>
+              <li>La planeación se <b>comparte con el docente antes</b> de implementarla.</li>
+              <li>Siempre se cierra con una <b>sesión de feedback</b> de transferencia después de la clase modelada.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="type-sec" id="fo">
+        <div class="type-hdr" style="background:var(--amber)">
+          <div class="type-icon" style="background:rgba(255,255,255,.25)">◉</div>
+          <div><h3>Observación Formal</h3><div class="purp">Observación completa calificada por indicadores</div></div>
+        </div>
+        <div class="type-body">
+          <h4>Cómo registrarlo (formulario en 4 pasos)</h4>
+          <ol class="steps">
+            <li><b>Datos generales:</b> nivel, grupo, materia, objetivo de la clase y parte de la clase observada.</li>
+            <li><b>Dominio:</b> elige el dominio a evaluar.</li>
+            <li><b>Indicadores:</b> califica cada indicador del dominio en una escala de 0 a 3 (puedes consultar la descripción de cada nivel de la escala) y agrega notas por indicador si lo necesitas.</li>
+            <li><b>Reflexión final:</b> qué salió bien, qué mejorar, los compromisos acordados con el docente, la valoración general de la sesión y las estrategias observadas.</li>
+          </ol>
+          <div class="rules" style="background:var(--amber-bg)">
+            <div class="rules-lbl" style="color:var(--amber-text)">⚑ Reglas del procedimiento</div>
+            <ul>
+              <li>Se califica con base en los <b>indicadores</b>, no en impresiones generales.</li>
+              <li><b>No se interviene</b> en la clase, salvo casos excepcionales de conducta que lo justifiquen.</li>
+              <li>El líder no deja de <b>observar al grupo</b> para ponerse a llenar su análisis — el registro no debe robarle atención a lo que pasa en el aula.</li>
+              <li>Siempre debe programarse una sesión de <b>Feedback posterior</b>, lo más cerca posible a la fecha observada — nunca dejarla pasar mucho tiempo.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="type-sec" id="fb">
+        <div class="type-hdr" style="background:var(--rose)">
+          <div class="type-icon" style="background:rgba(255,255,255,.22)">◎</div>
+          <div><h3>Feedback</h3><div class="purp">Conversación programada de retroalimentación</div></div>
+        </div>
+        <div class="type-body">
+          <h4>Cómo registrarlo</h4>
+          <ol class="steps">
+            <li><b>Reflexión del docente:</b> qué momento funcionó mejor, qué no salió como esperaba, si los estudiantes lograron el objetivo.</li>
+            <li><b>Retroalimentación del líder:</b> fortalezas metodológicas observadas, área de mejora específica, y la estrategia o ajuste concreto sugerido.</li>
+            <li><b>Cierre:</b> el compromiso concreto y observable que probará el docente antes de la próxima observación, qué apoyo necesita del líder, fecha de seguimiento, disposición del docente, y si está relacionado con una Observación Formal previa.</li>
+          </ol>
+          <div class="rules" style="background:var(--rose-bg)">
+            <div class="rules-lbl" style="color:var(--rose-text)">⚑ Reglas del procedimiento</div>
+            <ul>
+              <li>Es una sesión <b>programada</b> con el docente, no una conversación improvisada.</li>
+              <li>Debe realizarse a <b>más tardar 2 días</b> después de la observación que le dio origen.</li>
+              <li>Antes de la sesión, el líder <b>lee las observaciones y comentarios</b> ya registrados de esa actividad.</li>
+              <li>La conversación sigue las <b>preguntas del formulario</b>: primero la reflexión del docente, después la retroalimentación del líder, y se cierra con un compromiso y una fecha de seguimiento.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="borradores">
+      <h2>Borradores y ediciones</h2>
+      <p class="lead">No necesitas terminar un formulario de una sola sentada.</p>
+      <ul>
+        <li>Cualquier formulario (LW, FO, FB o MC) se puede <b>guardar como borrador</b> y retomar después — al reabrirlo verás un aviso de "Retomando tu borrador guardado".</li>
+        <li>Incluso si cierras el formulario con la <kbd>✕</kbd> sin pulsar ningún botón, lo que llevas escrito se guarda automáticamente como borrador.</li>
+        <li>Una actividad solo pasa a <b>Completada</b> cuando pulsas el botón de completar/validar dentro del formulario — guardar un borrador no la marca como terminada.</li>
+        <li>Puedes volver a abrir y <b>editar el formulario de una actividad ya completada</b> si necesitas corregir o ampliar algo.</li>
+      </ul>
+    </section>
+
+    <section id="vistas">
+      <h2>Actividades, calendario y filtros</h2>
+      <p class="lead">Varias vistas te dan distintos cortes de la misma información.</p>
+      <div class="pillgrid">
+        <div class="card" style="padding:14px 16px"><b style="font-size:13px">Actividades</b><p style="font-size:12.5px;margin-top:4px">Lista o calendario de todo lo registrado. Filtra por docente/líder, tipo, mes o estado (pendiente/completada).</p></div>
+        <div class="card" style="padding:14px 16px"><b style="font-size:13px">Calendario</b><p style="font-size:12.5px;margin-top:4px">Vista mensual de todas las actividades del colegio.</p></div>
+        <div class="card" style="padding:14px 16px"><b style="font-size:13px">Por docente</b><p style="font-size:12.5px;margin-top:4px">Historial de intervenciones de un docente específico. Desde aquí se genera su informe en PDF.</p></div>
+        <div class="card" style="padding:14px 16px"><b style="font-size:13px">Por líder</b><p style="font-size:12.5px;margin-top:4px">Actividades agrupadas por líder académico, con los mismos filtros de tipo, mes y estado.</p></div>
+        <div class="card" style="padding:14px 16px"><b style="font-size:13px">Por mes</b><p style="font-size:12.5px;margin-top:4px">Resumen mensual del avance por docente, para ver de un vistazo quién va atrasado.</p></div>
+        <div class="card" style="padding:14px 16px"><b style="font-size:13px">Mi calendario</b><p style="font-size:12.5px;margin-top:4px">Tus propias actividades agendadas, pendientes y completadas.</p></div>
+      </div>
+    </section>
+
+    <section id="outlook">
+      <h2>Sincronizar con Outlook</h2>
+      <p class="lead">Tu link personal refleja automáticamente todas tus actividades —nuevas, editadas o eliminadas— sin que tengas que volver a agregarlo.</p>
+      <div class="card">
+        <ol class="steps">
+          <li>Ve a <b>Mi calendario</b> y copia tu link personal (aparece ahí mismo, se copia con un clic).</li>
+          <li>En Outlook: <b>Calendario → Agregar calendario → Desde internet</b>.</li>
+          <li>Pega el link y pulsa <b>Aceptar</b>.</li>
+          <li>Listo — Outlook actualiza el calendario suscrito automáticamente cada pocas horas.</li>
+        </ol>
+        <div class="callout">💡 Es un link de solo lectura por persona: cada líder tiene el suyo y solo necesita agregarlo a Outlook <b>una vez</b>.</div>
+      </div>
+    </section>
+
+    <section id="reportes">
+      <h2>Reportes</h2>
+      <p class="lead">Dashboard visual con pestañas por tipo de observación (General, Obs. Formal, Learning Walk, Feedback, Modelaje, Programas). Usa los filtros superiores (docente, nivel, líder, mes) para acotar cualquier pestaña — se aplican a todas por igual.</p>
+    </section>
+
+    <section id="coaching">
+      <h2>Ciclos de coaching</h2>
+      <p class="lead">El plan de desarrollo profesional de cada docente, organizado en hasta 4 ciclos por año.</p>
+      <ul>
+        <li>El plan arranca con los <b>objetivos anuales</b> del docente en tres ejes: rigor académico, gestión y planeación — cada uno con su objetivo y su indicador de éxito — además de las habilidades desarrolladas y por desarrollar.</li>
+        <li>Cada <b>ciclo de coaching</b> define enfoque, líder responsable y fechas de inicio/cierre, las prácticas a implementar y cómo se monitorea el avance.</li>
+        <li>El ciclo incluye preguntas de reflexión (pasos previos, avances, dificultades, metas y compromisos) y una tabla de <b>acciones del ciclo</b> que se completa sola a partir de las actividades registradas en ese rango de fechas con ese responsable.</li>
+        <li>Desde el detalle del plan puedes <b>descargar el PDF</b> o guardar los cambios en cualquier momento.</li>
+      </ul>
+    </section>
+
+    <section id="programas">
+      <h2>Programas y hitos</h2>
+      <p class="lead">Seguimiento de los programas de formación del ciclo (Aprendizaje Activo, Innovation Lab, Clínicas de estrategias) por hitos validados con evidencia de aula.</p>
+      <ul>
+        <li>Entra al docente en <b>Programas → Docentes</b> para ver sus hitos por programa.</li>
+        <li>Para validar un hito, márcalo y revisa los <b>criterios observables</b>: marca los que el docente integró. Algunos hitos requieren un mínimo de criterios, o dos observaciones en clases distintas, o anexar una planeación/fecha de implementación.</li>
+        <li>Agrega tus <b>notas del observador</b> (evidencia, contexto, recomendaciones) antes de guardar — el hito queda registrado con tu nombre como quien lo validó.</li>
+        <li>La vista <b>Equipos</b> agrupa el avance por colegiado y muestra los retos lanzados entre equipos; desde ahí puedes compartir la vista pública con "🔗 Compartir vista pública".</li>
+      </ul>
+    </section>
+
+    <section id="gestionar">
+      <h2>Gestionar equipo <span style="font-size:11px;font-weight:600;color:var(--ink3);background:var(--paper2);padding:3px 9px;border-radius:99px;vertical-align:middle">solo administradores</span></h2>
+      <p class="lead">Alta y baja de docentes y líderes, y respaldo de los datos.</p>
+      <ul>
+        <li>Agrega docentes o líderes con el campo de texto y el botón <b>+ Agregar</b> en la columna correspondiente.</li>
+        <li>El respaldo a Google Sheets corre automáticamente cada 6 horas; el botón <b>🔄 Respaldar ahora</b> solo es para forzar una copia inmediata si la necesitas en el momento (por ejemplo, antes de un cambio importante).</li>
+      </ul>
+    </section>
+
+    <section id="pdfs">
+      <h2>Generar PDFs e informes</h2>
+      <ul>
+        <li><b>Informe por docente:</b> desde <b>Por docente → [nombre] → 📄 Generar informe</b>, con el historial completo de ese docente.</li>
+        <li><b>Plan de coaching:</b> desde el detalle del plan, botón <b>📄 Descargar PDF</b>.</li>
+        <li>Cada formulario completado (LW, FO, FB, MC) también puede imprimirse o enviarse como PDF desde su propia vista de detalle.</li>
+      </ul>
+    </section>
+
+    <section id="faq">
+      <h2>Preguntas frecuentes</h2>
+      <details class="faq">
+        <summary>¿Puedo editar una actividad que ya marqué como completada?</summary>
+        <p>Sí. Abre su detalle y usa "✏️ Editar formulario" para corregir o ampliar lo registrado.</p>
+      </details>
+      <details class="faq">
+        <summary>¿Qué pasa si no termino el formulario el mismo día?</summary>
+        <p>Guárdalo como borrador y retómalo cuando puedas — incluso si solo cierras el formulario con la "✕", lo escrito no se pierde.</p>
+      </details>
+      <details class="faq">
+        <summary>¿Cómo registro una observación en la que participó más de un líder?</summary>
+        <p>No crees dos actividades: marca al otro líder como co-líder dentro del formulario de la actividad. Así el docente queda observado una sola vez y ambos líderes tienen acceso a ella.</p>
+      </details>
+      <details class="faq">
+        <summary>¿Necesito agregar mi calendario de Outlook más de una vez?</summary>
+        <p>No. Se agrega una sola vez con tu link personal desde "Mi calendario" y Outlook lo sincroniza automáticamente cada pocas horas, aunque edites o elimines actividades después.</p>
+      </details>
+      <details class="faq">
+        <summary>¿Quién puede validar un hito de un programa de formación?</summary>
+        <p>Cualquier líder puede marcarlo desde la ficha del docente en "Programas", revisando los criterios observables correspondientes. El hito queda registrado con el nombre de quien lo validó.</p>
+      </details>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>
